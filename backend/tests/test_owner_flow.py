@@ -1,0 +1,101 @@
+"""Run against an empty, disposable database: TEST_DATABASE_URL=... python -m unittest discover -s backend/tests."""
+import base64
+import hashlib
+import hmac
+import json
+import os
+import sys
+import time
+import unittest
+from io import BytesIO
+from pathlib import Path
+from urllib.parse import urlencode
+
+from fastapi.testclient import TestClient
+from PIL import Image
+
+os.environ['BOT_TOKEN'] = 'test-token-not-a-real-bot'
+os.environ['ADMIN_TELEGRAM_ID'] = '999'
+os.environ['CORS_ORIGINS'] = 'https://example.test'
+os.environ['DATABASE_URL'] = os.environ.get('TEST_DATABASE_URL', '')
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from app import main
+
+def headers(user=101, age=0):
+    fields = {'auth_date': str(int(time.time()) - age), 'user': json.dumps({'id': user, 'first_name': 'Owner'})}
+    check = '\n'.join(f'{k}={fields[k]}' for k in sorted(fields))
+    secret = hmac.new(b'WebAppData', main.BOT_TOKEN.encode(), hashlib.sha256).digest()
+    fields['hash'] = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
+    return {'X-Telegram-Init-Data': urlencode(fields)}
+
+def payload():
+    output = BytesIO()
+    Image.new('RGB', (400, 300), 'green').save(output, format='PNG')
+    return {'name': 'Test pitch', 'sport': 'football', 'address': 'Selected map location',
+            'latitude': 41.0011, 'longitude': 71.6726, 'price': 100000,
+            'photos': [base64.b64encode(output.getvalue()).decode()]}
+
+class AuthTests(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(main.app)
+
+    def test_verified_identity(self):
+        self.assertEqual(self.client.get('/auth/me', headers=headers()).json()['id'], 101)
+
+    def test_rejects_missing_expired_forged_duplicate_and_future_auth(self):
+        for value in [{}, headers(age=4000), headers(age=-300),
+                      {'X-Telegram-Init-Data': headers()['X-Telegram-Init-Data'].replace('101', '102')},
+                      {'X-Telegram-Init-Data': headers()['X-Telegram-Init-Data'] + '&auth_date=0'}]:
+            self.assertEqual(self.client.get('/auth/me', headers=value).status_code, 401)
+
+    def test_photo_validation(self):
+        photo = main.prepare_photo(payload()['photos'][0])
+        self.assertEqual(Image.open(BytesIO(photo)).format, 'JPEG')
+        for value in ['not base64', base64.b64encode(b'<svg/>').decode()]:
+            with self.assertRaises(main.HTTPException): main.prepare_photo(value)
+
+    def test_missing_photos_and_large_body(self):
+        data = payload(); data['photos'] = []
+        self.assertEqual(self.client.post('/venues', headers=headers(), json=data).status_code, 422)
+        self.assertEqual(self.client.post('/venues', headers=headers(), content=b' ' * 7500001).status_code, 413)
+
+@unittest.skipUnless(os.environ.get('TEST_DATABASE_URL'), 'Disposable PostgreSQL required')
+class OwnerIntegrationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.context = TestClient(main.app)
+        cls.client = cls.context.__enter__()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.context.__exit__(None, None, None)
+
+    def test_submission_owner_isolation_moderation_and_photo_access(self):
+        data = payload(); data['owner_telegram_id'] = 202
+        response = self.client.post('/venues', headers=headers(101), json=data)
+        self.assertEqual(response.status_code, 201, response.text)
+        venue_id = response.json()['id']
+        own = self.client.get('/owner/venues', headers=headers(101)).json()
+        venue = next(v for v in own if v['id'] == venue_id)
+        self.assertNotIn(venue_id, [v['id'] for v in self.client.get('/owner/venues', headers=headers(202)).json()])
+        self.assertNotIn(venue_id, [v['id'] for v in self.client.get('/venues').json()])
+        photo = '/photos/' + str(venue['photos'][0])
+        self.assertEqual(self.client.get(photo).status_code, 401)
+        self.assertEqual(self.client.get(photo, headers=headers(202)).status_code, 404)
+        self.assertEqual(self.client.get(photo, headers=headers(101)).status_code, 200)
+        self.assertEqual(self.client.get(photo, headers=headers(999)).status_code, 200)
+        self.assertEqual(self.client.post(f'/admin/venues/{venue_id}/approved', headers=headers(101)).status_code, 403)
+        self.assertEqual(self.client.post(f'/admin/venues/{venue_id}/approved', headers=headers(999)).status_code, 200)
+        public = next(v for v in self.client.get('/venues').json() if v['id'] == venue_id)
+        self.assertEqual(public['latitude'], data['latitude'])
+        self.assertEqual(public['longitude'], data['longitude'])
+        self.assertEqual(self.client.get(photo).status_code, 200)
+
+    def test_invalid_photo_does_not_create_venue(self):
+        before = self.client.get('/owner/venues', headers=headers(303)).json()
+        data = payload(); data['photos'].append('invalid')
+        self.assertEqual(self.client.post('/venues', headers=headers(303), json=data).status_code, 422)
+        self.assertEqual(self.client.get('/owner/venues', headers=headers(303)).json(), before)
+
+if __name__ == '__main__':
+    unittest.main()

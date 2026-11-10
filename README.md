@@ -66,6 +66,36 @@ and [Dockerfile detection](https://docs.railway.com/builds/dockerfiles).
 - Owners can confirm/reject; users can cancel pending requests.
 - Admin approval required before venue appears publicly.
 
+## Owner sign-in and pitch submissions
+
+Open [@maydontopbot](https://t.me/maydontopbot), press Start, then use the
+MAYDON button. The website's Telegram sign-in link opens this flow; ordinary
+browser visits remain guests. `/auth/me` verifies Telegram's signed Mini App
+data before displaying an account. Set backend `BOT_USERNAME=maydontopbot`.
+
+Owners use Profile → Maydon egasi paneli (or `/owner` in the bot) to submit
+their pitch. Select a point on the map or use GPS, then confirm the location;
+there are no manual address or coordinate inputs. Address lookup is automatic
+when available; coordinates remain usable if lookup fails. Directions links
+use the saved coordinates.
+
+New submissions require 1–5 actual pitch photos. The browser resizes photos;
+the API validates and re-encodes them as JPEG, removing image metadata.
+Photos are stored in PostgreSQL, survive redeploys, and remain private to the
+owner and admin until approval. Admins review photos, location and the owner's
+Telegram ID. Photos are supporting evidence, not automatic ownership verification.
+Existing listings without photos remain readable.
+
+Deploy the bot as one persistent Railway service, root `bot`, with `BOT_TOKEN`,
+`DATABASE_URL`, `ADMIN_TELEGRAM_ID`, and `MINI_APP_URL` set to the Railway frontend.
+The worker configures the Telegram menu button on startup. CLI deployment:
+`railway up bot --path-as-root -s Maydon-bot --detach`.
+
+Backend checks (use an empty disposable PostgreSQL database): install
+`backend/requirements.txt` and `httpx`, then run
+`TEST_DATABASE_URL=postgresql://... python -m unittest discover -s backend/tests -v`.
+Frontend check: run `npm ci && npm run build` in `miniapp/`.
+
 **Before public launch:** Add owner/admin UI, notification delivery, rate limits, monitoring, opening-hour validation, privacy policy, and run end-to-end tests. A passing Python syntax check is not a production acceptance test.
 # Maydon
 # Maydon

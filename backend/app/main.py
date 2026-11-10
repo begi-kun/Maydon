@@ -4,6 +4,9 @@ import hmac
 import json
 import os
 import time
+import base64
+import binascii
+from io import BytesIO
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl
 from contextlib import contextmanager
@@ -11,9 +14,11 @@ from typing import Literal
 
 import psycopg
 from psycopg.rows import dict_row
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
+from PIL import Image, ImageOps, UnidentifiedImageError
+from starlette.concurrency import run_in_threadpool
 
 DATABASE_URL = os.getenv('DATABASE_URL', '')
 BOT_TOKEN = os.getenv('BOT_TOKEN', '')
@@ -29,26 +34,42 @@ def db():
     with psycopg.connect(DATABASE_URL, row_factory=dict_row) as conn:
         yield conn
 
-def authenticate(init_data: str = Header(default='', alias='X-Telegram-Init-Data')) -> int:
+def telegram_identity(init_data: str) -> dict:
     if not BOT_TOKEN or not init_data:
         raise HTTPException(401, 'Telegram authentication required')
     try:
-        fields = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=True))
+        pairs = parse_qsl(init_data, keep_blank_values=True, strict_parsing=True)
+        fields = dict(pairs)
+        if len(fields) != len(pairs):
+            raise ValueError('Duplicate fields')
         received_hash = fields.pop('hash')
         auth_date = int(fields['auth_date'])
-        if abs(time.time() - auth_date) > 3600:
+        if auth_date > time.time() + 30 or time.time() - auth_date > 3600:
             raise ValueError('Expired Telegram login')
         data_check = '\n'.join(f'{key}={fields[key]}' for key in sorted(fields))
         secret = hmac.new(b'WebAppData', BOT_TOKEN.encode(), hashlib.sha256).digest()
         calculated = hmac.new(secret, data_check.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(received_hash, calculated):
             raise ValueError('Invalid signature')
-        user_id = int(json.loads(fields['user'])['id'])
-        if user_id <= 0:
+        user = json.loads(fields['user'])
+        user_id = user['id']
+        if type(user_id) is not int or user_id <= 0:
             raise ValueError('Invalid user')
-        return user_id
+        return {'id': user_id, 'first_name': str(user.get('first_name', '')), 'username': str(user.get('username', ''))}
     except (KeyError, ValueError, TypeError, json.JSONDecodeError):
         raise HTTPException(401, 'Invalid Telegram authentication')
+
+def authenticate(init_data: str = Header(default='', alias='X-Telegram-Init-Data')) -> int:
+    return telegram_identity(init_data)['id']
+
+@app.get('/auth/me')
+def auth_me(init_data: str = Header(default='', alias='X-Telegram-Init-Data')):
+    user = telegram_identity(init_data)
+    return {**user, 'admin': bool(ADMIN_ID and str(user['id']) == ADMIN_ID)}
+
+@app.get('/auth/config')
+def auth_config():
+    return {'bot_username': os.getenv('BOT_USERNAME', '')}
 
 def admin(user: int = Depends(authenticate)) -> int:
     if not ADMIN_ID or str(user) != ADMIN_ID:
@@ -64,6 +85,25 @@ class VenueIn(BaseModel):
     price: int = Field(ge=0, le=100000000)
     phone: str = Field(default='', max_length=40)
     hours: str = Field(default='', max_length=120)
+    photos: list[str] = Field(min_length=1, max_length=5)
+
+def prepare_photo(encoded: str) -> bytes:
+    if len(encoded) > 1400000:
+        raise HTTPException(413, 'Each photo must be smaller than 1 MB')
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+        with Image.open(BytesIO(raw)) as source:
+            if source.format not in ('JPEG', 'PNG', 'WEBP') or source.width * source.height > 20000000:
+                raise ValueError('Unsupported image')
+            if min(source.size) < 200:
+                raise ValueError('Photo is too small')
+            photo = ImageOps.exif_transpose(source).convert('RGB')
+            photo.thumbnail((1600, 1600))
+            output = BytesIO()
+            photo.save(output, format='JPEG', quality=85)
+            return output.getvalue()
+    except (ValueError, binascii.Error, UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        raise HTTPException(422, 'Upload valid JPEG, PNG or WebP pitch photos, at least 200 pixels per side')
 
 class BookingIn(BaseModel):
     venue_id: int
@@ -85,6 +125,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS bookings_one_active_slot ON bookings(venue_id,
 CREATE TABLE IF NOT EXISTS notifications (id BIGSERIAL PRIMARY KEY, recipient_id BIGINT NOT NULL, body TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), sent_at TIMESTAMPTZ);
 CREATE INDEX IF NOT EXISTS bookings_venue_start ON bookings(venue_id,start_at);
 CREATE INDEX IF NOT EXISTS bookings_user ON bookings(user_telegram_id);
+CREATE TABLE IF NOT EXISTS venue_photos (
+ id BIGSERIAL PRIMARY KEY, venue_id BIGINT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
+ image BYTEA NOT NULL);
+CREATE INDEX IF NOT EXISTS venue_photos_venue ON venue_photos(venue_id);
 '''
 
 @app.on_event('startup')
@@ -104,23 +148,49 @@ def health():
 def venues(sport: str | None = None):
     with db() as conn:
         if sport:
-            return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours FROM venues WHERE status=%s AND sport=%s ORDER BY id DESC', ('approved',sport)).fetchall()
-        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours FROM venues WHERE status=%s ORDER BY id DESC', ('approved',)).fetchall()
+            return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE status=%s AND sport=%s ORDER BY id DESC', ('approved',sport)).fetchall()
+        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE status=%s ORDER BY id DESC', ('approved',)).fetchall()
 
 @app.post('/venues', status_code=201)
-def request_venue(venue: VenueIn, user: int = Depends(authenticate)):
+async def request_venue(request: Request, user: int = Depends(authenticate)):
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > 7500000:
+            raise HTTPException(413, 'Photo submission is too large')
+    try:
+        venue = VenueIn.model_validate_json(body)
+    except ValidationError:
+        raise HTTPException(422, 'Check venue details and include 1–5 pitch photos')
+    return await run_in_threadpool(save_venue, venue, user)
+
+def save_venue(venue: VenueIn, user: int):
+    photos = [prepare_photo(photo) for photo in venue.photos]
     with db() as conn:
         result = conn.execute('''INSERT INTO venues(name,sport,address,latitude,longitude,price,phone,hours,owner_telegram_id)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''', (*venue.model_dump().values(),user)).fetchone()
-    with db() as conn:
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''', (*venue.model_dump(exclude={'photos'}).values(),user)).fetchone()
+        for photo in photos:
+            conn.execute('INSERT INTO venue_photos(venue_id,image) VALUES (%s,%s)', (result['id'], photo))
         if ADMIN_ID:
             conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)', (int(ADMIN_ID), f'🏟 Yangi maydon arizasi #{result["id"]}: {venue.name}. /admin'))
     return {'id':result['id'],'status':'pending'}
 
+@app.get('/photos/{photo_id}')
+def get_photo(photo_id: int, init_data: str = Header(default='', alias='X-Telegram-Init-Data')):
+    with db() as conn:
+        row = conn.execute('SELECT p.image,v.status,v.owner_telegram_id FROM venue_photos p JOIN venues v ON v.id=p.venue_id WHERE p.id=%s', (photo_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, 'Photo not found')
+    if row['status'] != 'approved':
+        user = telegram_identity(init_data)['id']
+        if user != row['owner_telegram_id'] and str(user) != ADMIN_ID:
+            raise HTTPException(404, 'Photo not found')
+    return Response(bytes(row['image']), media_type='image/jpeg', headers={'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff'})
+
 @app.get('/admin/venues')
 def pending_venues(_: int = Depends(admin)):
     with db() as conn:
-        return conn.execute("SELECT * FROM venues WHERE status='pending' ORDER BY id").fetchall()
+        return conn.execute("SELECT *, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE status='pending' ORDER BY id").fetchall()
 
 @app.post('/admin/venues/{venue_id}/{decision}')
 def decide_venue(venue_id: int, decision: Literal['approved','rejected'], _: int = Depends(admin)):
@@ -187,7 +257,7 @@ def cancel(booking_id: int, user: int = Depends(authenticate)):
 @app.get('/owner/venues')
 def owner_venues(user: int = Depends(authenticate)):
     with db() as conn:
-        return conn.execute('SELECT id,name,sport,address,price,status FROM venues WHERE owner_telegram_id=%s ORDER BY id DESC',(user,)).fetchall()
+        return conn.execute('SELECT id,name,sport,address,price,status, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE owner_telegram_id=%s ORDER BY id DESC',(user,)).fetchall()
 
 @app.get('/admin/status')
 def admin_status(user: int = Depends(authenticate)):
