@@ -8,6 +8,52 @@ Monorepo:
 - `bot/`: aiogram Telegram bot, deploy as an always-on Render background worker.
 
 ## Deployment
+
+### Railway
+
+Deploy the API and bot as **two separate services** from this repository. In each
+service, open **Settings → Source → Root Directory** and use the settings below:
+
+| Setting | API service | Bot service |
+| --- | --- | --- |
+| Root Directory | `/backend` | `/bot` |
+| Builder | Dockerfile (automatically detected) | Dockerfile (automatically detected) |
+| Custom build/start commands | Leave empty; use Dockerfile defaults | Leave empty; use Dockerfile defaults |
+| Healthcheck path | `/health` | Leave empty (polling worker) |
+| Replicas | 1 initially | Exactly 1 |
+| Variables | `DATABASE_URL`, `BOT_TOKEN`, `ADMIN_TELEGRAM_ID`, `CORS_ORIGINS` | `DATABASE_URL`, `BOT_TOKEN`, `ADMIN_TELEGRAM_ID`, `MINI_APP_URL` |
+
+Provision PostgreSQL and set `DATABASE_URL` in both services to the same database.
+Deploy the API first so it initializes the database tables. Generate a public
+domain for the API and use its HTTPS origin as the miniapp's `VITE_API_URL`.
+Set `CORS_ORIGINS` and `MINI_APP_URL` to the deployed miniapp's HTTPS origin.
+Deploy the miniapp as a third Railway service using `miniapp/Dockerfile`, with
+`VITE_API_URL` set to the API's HTTPS origin before building. The image serves
+the built app with nginx on port `8080`; generate its Railway domain targeting
+that port. Set the API's `CORS_ORIGINS` and the bot's `MINI_APP_URL` to this web
+domain. Run the bot continuously with sleeping/serverless disabled.
+
+Current Railway frontend: https://maydon-web-production-3612.up.railway.app
+
+Current Railway API: https://maydon-production-ba2c.up.railway.app
+
+The frontend was deployed from this checkout using
+`railway up miniapp --path-as-root -s Maydon-web --detach`. Repeat that command
+after frontend changes, or connect its GitHub source with root `/miniapp` after
+pushing the Dockerfile and lockfile.
+
+If deployment says **“Script start.sh not found”** or **“Railpack could not
+determine how to build the app”** and lists `backend/`, `bot/`, and `miniapp/`,
+Railway is building the repository root. Set the service's Root Directory as
+above and redeploy. No `start.sh` is needed: each Python service already has a
+Dockerfile that installs its dependencies and starts its process. Adding a
+`.dockerignore` only excludes files; it does not fix the incorrect build root.
+
+See [Railway monorepo deployment](https://docs.railway.com/deployments/monorepo)
+and [Dockerfile detection](https://docs.railway.com/builds/dockerfiles).
+
+### Render + Vercel
+
 1. Push files to your own GitHub repo (do not commit `.env` or credentials).
 2. Provision managed PostgreSQL. Configure backend Render root `backend`, Docker runtime, health check `/health`, and secrets `DATABASE_URL`, `BOT_TOKEN`, `ADMIN_TELEGRAM_ID`, `CORS_ORIGINS`.
 3. Configure Vercel root `miniapp`, framework Vite, build `npm run build`, output `dist`; set `VITE_API_URL` to the HTTPS backend origin. Optional `VITE_YANDEX_MAPS_KEY` must be restricted by domain.
