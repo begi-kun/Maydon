@@ -3,6 +3,8 @@ import React, {useEffect, useRef, useState} from 'react';
 export const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 export const authHeaders = () => ({'X-Telegram-Init-Data': window.Telegram?.WebApp?.initData || ''});
 export const directions = (lat:number, lon:number) => `https://yandex.com/maps/?rtext=~${lat},${lon}&rtt=auto`;
+// Map previews use longitude,latitude; routing uses latitude,longitude.
+export const mapLocation = (lat:number, lon:number) => `https://yandex.com/maps/?${new URLSearchParams({ll:`${lon},${lat}`,pt:`${lon},${lat}`,z:'18',l:'map'})}`;
 
 export function PhotoGallery({ids=[]}:{ids?:number[]}) {
  return <div className="photos">{ids.map(id=><PitchPhoto key={id} id={id}/>)}</div>;
@@ -36,15 +38,21 @@ function LocationPicker({onChange}:{onChange:(value:Location|null)=>void}) {
  const element=useRef<HTMLDivElement>(null);const map=useRef<any>();const marker=useRef<any>();
  const [location,setLocation]=useState<Location|null>(null);const [error,setError]=useState('');const [gps,setGps]=useState(false);
  const generation=useRef(0);const active=useRef(true);const callback=useRef(onChange);callback.current=onChange;
+ const selectedCoords=useRef<number[]|null>(null);
  const select=useRef((coords:number[])=>{});
+ function showPin(coords:number[]){
+  if(!map.current||!window.ymaps)return;
+  if(marker.current)marker.current.geometry.setCoordinates([...coords]);
+  else{marker.current=new window.ymaps.Placemark([...coords],{}, {draggable:true});map.current.geoObjects.add(marker.current);marker.current.events.add('dragend',()=>select.current(marker.current.geometry.getCoordinates()));}
+  map.current.setCenter([...coords],17);
+ }
  select.current=async(coords:number[])=>{
   const version=++generation.current;const [latitude,longitude]=coords;
+  selectedCoords.current=[latitude,longitude];setGps(false);
   const picked={latitude,longitude,address:`Xaritadagi joy: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`};
   setLocation(picked);callback.current(picked);setError('');
   if(map.current&&window.ymaps){
-   if(marker.current)marker.current.geometry.setCoordinates(coords);
-   else{marker.current=new window.ymaps.Placemark(coords,{}, {draggable:true});map.current.geoObjects.add(marker.current);marker.current.events.add('dragend',()=>select.current(marker.current.geometry.getCoordinates()));}
-   map.current.setCenter(coords,17);
+   showPin([latitude,longitude]);
    try {const result=await window.ymaps.geocode(coords);const address=result.geoObjects.get(0)?.getAddressLine();
     if(active.current&&version===generation.current&&address){const resolved={...picked,address};setLocation(resolved);callback.current(resolved);}
    } catch {/* The selected coordinates remain usable without geocoding. */}
@@ -53,15 +61,17 @@ function LocationPicker({onChange}:{onChange:(value:Location|null)=>void}) {
  useEffect(()=>{active.current=true;loadMaps().then(ymaps=>{if(!active.current||!element.current)return;
   map.current=new ymaps.Map(element.current,{center:[41.0011,71.6726],zoom:12,controls:['zoomControl']});
   map.current.events.add('click',(event:any)=>select.current(event.get('coords')));
+  if(selectedCoords.current)showPin(selectedCoords.current);
  }).catch(e=>{if(active.current)setError(e.message)});
  return()=>{active.current=false;generation.current++;map.current?.destroy()};},[]);
  function locate(){if(!navigator.geolocation){setError('GPS mavjud emas. Xaritadan nuqta tanlang.');return;}
-  setGps(true);navigator.geolocation.getCurrentPosition(p=>{if(!active.current)return;setGps(false);select.current([p.coords.latitude,p.coords.longitude]);},()=>{if(!active.current)return;setGps(false);setError('Joylashuvga ruxsat bering yoki xaritada maydonni bosing.');},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  const version=++generation.current;
+  setGps(true);navigator.geolocation.getCurrentPosition(p=>{if(!active.current||version!==generation.current)return;setGps(false);select.current([p.coords.latitude,p.coords.longitude]);},()=>{if(!active.current||version!==generation.current)return;setGps(false);setError('Joylashuvga ruxsat bering yoki xaritada maydonni bosing.');},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
  }
  return <div className="location-picker"><h4>Maydon joylashuvi</h4><p>Maydonning kirish joyini xaritada bosing yoki maydonda turgan holda GPSdan foydalaning.</p>
   <button type="button" className="setting full" disabled={gps} onClick={locate}>{gps?'Joylashuv aniqlanmoqda…':'📍 Hozirgi joylashuvim'}</button>
   <div ref={element} className="location-map" aria-label="Maydon joylashuvini tanlash xaritasi"/>
-  {error&&<p role="status">{error}</p>}{location&&<><p>{location.address}</p><a href={directions(location.latitude,location.longitude)} target="_blank" rel="noreferrer">Xaritada tekshirish ↗</a>
+  {error&&<p role="status">{error}</p>}{location&&<><p>{location.address}</p><a href={mapLocation(location.latitude,location.longitude)} target="_blank" rel="noreferrer">Tanlangan nuqtani xaritada koʻrish ↗</a>
   <p role="status">✓ Joylashuv tanlandi. Oʻzgartirish uchun xaritada boshqa joyni bosing.</p></>}
  </div>;
 }
