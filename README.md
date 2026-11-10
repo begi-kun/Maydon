@@ -22,3 +22,4 @@ Monorepo:
 
 **Before public launch:** Add owner/admin UI, notification delivery, rate limits, monitoring, opening-hour validation, privacy policy, and run end-to-end tests. A passing Python syntax check is not a production acceptance test.
 # Maydon
+# Maydon
