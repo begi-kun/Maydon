@@ -74,7 +74,7 @@ browser visits remain guests. `/auth/me` verifies Telegram's signed Mini App
 data before displaying an account. Set backend `BOT_USERNAME=maydontopbot`.
 
 Owners use Profile → Maydon egasi paneli (or `/owner` in the bot) to submit
-their pitch. Select a point on the map or use GPS, then confirm the location;
+their pitch. Select a point on the map or use GPS; the selected location is saved automatically,
 there are no manual address or coordinate inputs. Address lookup is automatic
 when available; coordinates remain usable if lookup fails. Directions links
 use the saved coordinates.

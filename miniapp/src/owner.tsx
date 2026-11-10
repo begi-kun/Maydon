@@ -34,19 +34,19 @@ export function loadMaps():Promise<any> {
 type Location={latitude:number;longitude:number;address:string};
 function LocationPicker({onChange}:{onChange:(value:Location|null)=>void}) {
  const element=useRef<HTMLDivElement>(null);const map=useRef<any>();const marker=useRef<any>();
- const [location,setLocation]=useState<Location|null>(null);const [error,setError]=useState('');const [gps,setGps]=useState(false);const [confirmed,setConfirmed]=useState(false);
+ const [location,setLocation]=useState<Location|null>(null);const [error,setError]=useState('');const [gps,setGps]=useState(false);
  const generation=useRef(0);const active=useRef(true);const callback=useRef(onChange);callback.current=onChange;
  const select=useRef((coords:number[])=>{});
  select.current=async(coords:number[])=>{
   const version=++generation.current;const [latitude,longitude]=coords;
   const picked={latitude,longitude,address:`Xaritadagi joy: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`};
-  setLocation(picked);setConfirmed(false);callback.current(null);setError('');
+  setLocation(picked);callback.current(picked);setError('');
   if(map.current&&window.ymaps){
    if(marker.current)marker.current.geometry.setCoordinates(coords);
    else{marker.current=new window.ymaps.Placemark(coords,{}, {draggable:true});map.current.geoObjects.add(marker.current);marker.current.events.add('dragend',()=>select.current(marker.current.geometry.getCoordinates()));}
    map.current.setCenter(coords,17);
    try {const result=await window.ymaps.geocode(coords);const address=result.geoObjects.get(0)?.getAddressLine();
-    if(active.current&&version===generation.current&&address)setLocation({...picked,address});
+    if(active.current&&version===generation.current&&address){const resolved={...picked,address};setLocation(resolved);callback.current(resolved);}
    } catch {/* The selected coordinates remain usable without geocoding. */}
   }
  };
@@ -62,7 +62,7 @@ function LocationPicker({onChange}:{onChange:(value:Location|null)=>void}) {
   <button type="button" className="setting full" disabled={gps} onClick={locate}>{gps?'Joylashuv aniqlanmoqda…':'📍 Hozirgi joylashuvim'}</button>
   <div ref={element} className="location-map" aria-label="Maydon joylashuvini tanlash xaritasi"/>
   {error&&<p role="status">{error}</p>}{location&&<><p>{location.address}</p><a href={directions(location.latitude,location.longitude)} target="_blank" rel="noreferrer">Xaritada tekshirish ↗</a>
-  <button type="button" className="setting full" onClick={()=>{setConfirmed(true);callback.current(location)}}>{confirmed?'✓ Joylashuv tasdiqlandi':'Maydonim aynan shu joyda — tasdiqlash'}</button></>}
+  <p role="status">✓ Joylashuv tanlandi. Oʻzgartirish uchun xaritada boshqa joyni bosing.</p></>}
  </div>;
 }
 
@@ -78,8 +78,13 @@ async function resizePhoto(file:File):Promise<string> {
 
 export function OwnerForm({onSaved,onExpired}:{onSaved:()=>void;onExpired:()=>void}) {
  const [location,setLocation]=useState<Location|null>(null);const [photos,setPhotos]=useState<string[]>([]);const [busy,setBusy]=useState(false);const [processing,setProcessing]=useState(false);const [error,setError]=useState('');const [saved,setSaved]=useState(false);
- async function submit(event:React.FormEvent<HTMLFormElement>){event.preventDefault();if(!location||!photos.length)return;
-  setBusy(true);setError('');const data=new FormData(event.currentTarget);
+ async function submit(event:React.FormEvent<HTMLFormElement>){event.preventDefault();
+  if(busy||processing)return;
+  const form=event.currentTarget;
+  if(!form.checkValidity()){setError('Majburiy maydonlarni toʻldiring va maydonni boshqarishga ruxsatingiz borligini belgilang.');form.reportValidity();return;}
+  if(!location){setError('Maydon joylashuvini xaritada bosing yoki “Hozirgi joylashuvim” tugmasidan foydalaning.');return;}
+  if(!photos.length){setError('Maydonning kamida bitta rasmini yuklang.');return;}
+  const data=new FormData(form);setBusy(true);setError('');
   try{const response=await fetch(`${API}/venues`,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({...Object.fromEntries(data.entries()),price:Number(data.get('price')),...location,photos})});
    if(response.status===401){onExpired();throw Error('Kirish muddati tugadi. Ilovani Telegramdan qayta oching.');}
    if(!response.ok){const body=await response.json();throw Error(typeof body.detail==='string'?body.detail:'Maʼlumotlarni tekshiring.');}
@@ -87,7 +92,7 @@ export function OwnerForm({onSaved,onExpired}:{onSaved:()=>void;onExpired:()=>vo
   }catch(e){setError(e instanceof Error?e.message:'Yuborilmadi. Qayta urinib koʻring.')}finally{setBusy(false)}
  }
  if(saved)return <div className="setting" role="status"><h4>✓ Ariza yuborildi</h4><p>Maydoningiz va rasmlaringiz admin tekshiruvida. Tasdiqlangandan keyin ommaga koʻrinadi.</p><button onClick={()=>{setSaved(false);setPhotos([]);setLocation(null)}}>Yana maydon qoʻshish</button></div>;
- return <form onSubmit={submit}><fieldset disabled={busy}><h4>Yangi maydon qoʻshish</h4>
+ return <form onSubmit={submit} noValidate><fieldset disabled={busy}><h4>Yangi maydon qoʻshish</h4>
   <label>Maydon nomi<input name="name" required minLength={2} maxLength={120}/></label>
   <label>Sport<select name="sport"><option value="football">Futbol</option><option value="table_tennis">Stol tennisi</option><option value="billiards">Bilyard</option></select></label>
   <label>Bir soat narxi (soʻm)<input name="price" type="number" min={0} max={100000000} step={1} required/></label>
@@ -100,8 +105,9 @@ export function OwnerForm({onSaved,onExpired}:{onSaved:()=>void;onExpired:()=>vo
    try{const next:string[]=[];for(const file of files)next.push(await resizePhoto(file));setPhotos(old=>[...old,...next]);}catch(e){setError(e instanceof Error?e.message:'Rasm yuklanmadi.')}finally{setProcessing(false)}
   }}/></label><p>Maydonning umumiy koʻrinishi, kirish joyi va oʻyin hududini koʻrsating. Shaxsiy hujjatlarni yuklamang. Rasmlar tasdiqlangach eʼlonda koʻrinadi.</p>
   <div className="photos">{photos.map((photo,index)=><div key={index}><img src={`data:image/jpeg;base64,${photo}`} alt={`Maydon rasmi ${index+1}`}/><button type="button" disabled={processing} onClick={()=>setPhotos(old=>old.filter((_,i)=>i!==index))}>Oʻchirish</button></div>)}</div>
+  <p role="status">{location?'✓ Joylashuv tanlandi':'○ Xaritadan yoki GPS orqali joylashuvni tanlang'} · {photos.length?`✓ ${photos.length} ta rasm tayyor`:'○ Kamida bitta rasm yuklang'}</p>
   <label className="consent"><input type="checkbox" required/>Bu maydonni boshqarishga va ushbu rasmlarni joylashga ruxsatim bor.</label>
   {error&&<p role="alert">{error}</p>}
-  <button className="primary" disabled={busy||processing||!location||!photos.length}>{busy?'Yuborilmoqda…':processing?'Rasmlar tayyorlanmoqda…':'Admin tekshiruviga yuborish'}</button>
+  <button className="primary" disabled={busy||processing}>{busy?'Yuborilmoqda…':processing?'Rasmlar tayyorlanmoqda…':'Admin tekshiruviga yuborish'}</button>
  </fieldset></form>;
 }
