@@ -43,6 +43,12 @@ class AuthTests(unittest.TestCase):
     def test_verified_identity(self):
         self.assertEqual(self.client.get('/auth/me', headers=headers()).json()['id'], 101)
 
+    def test_booking_notification_uses_uzbekistan_time(self):
+        self.assertEqual(main.booking_time_label(datetime(2026, 11, 11, 14, tzinfo=timezone.utc)),
+                         '11.11.2026 · 19:00 (Oʻzbekiston vaqti, UTC+5)')
+        self.assertEqual(main.booking_time_label(datetime(2026, 11, 11, 22, tzinfo=timezone.utc)),
+                         '12.11.2026 · 03:00 (Oʻzbekiston vaqti, UTC+5)')
+
     def test_rejects_missing_expired_forged_duplicate_and_future_auth(self):
         for value in [{}, headers(age=4000), headers(age=-300),
                       {'X-Telegram-Init-Data': headers()['X-Telegram-Init-Data'].replace('101', '102')},

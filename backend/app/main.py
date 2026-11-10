@@ -24,6 +24,11 @@ DATABASE_URL = os.getenv('DATABASE_URL', '')
 BOT_TOKEN = os.getenv('BOT_TOKEN', '')
 ADMIN_ID = os.getenv('ADMIN_TELEGRAM_ID', '')
 ORIGINS = [x.strip() for x in os.getenv('CORS_ORIGINS', '').split(',') if x.strip()]
+UZBEKISTAN_TIME = timezone(timedelta(hours=5))
+
+def booking_time_label(value: datetime) -> str:
+    return value.astimezone(UZBEKISTAN_TIME).strftime('%d.%m.%Y · %H:%M') + ' (Oʻzbekiston vaqti, UTC+5)'
+
 app = FastAPI(title='MAYDON API', docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_credentials=False, allow_methods=['GET','POST'], allow_headers=['Content-Type','X-Telegram-Init-Data'])
 
@@ -153,7 +158,7 @@ def venues(sport: str | None = None):
 
 @app.get('/venues/{venue_id}/availability')
 def availability(venue_id: int, day: date):
-    local_zone = timezone(timedelta(hours=5))
+    local_zone = UZBEKISTAN_TIME
     now = datetime.now(timezone.utc)
     start = datetime.combine(day, day_time(), tzinfo=local_zone)
     if day < now.astimezone(local_zone).date() or day > (now + timedelta(days=60)).astimezone(local_zone).date():
@@ -240,7 +245,7 @@ def book(booking: BookingIn, user: int = Depends(authenticate)):
         if conflict: raise HTTPException(409,'This time slot is already reserved')
         row = conn.execute('INSERT INTO bookings(venue_id,user_telegram_id,start_at) VALUES (%s,%s,%s) RETURNING id', (booking.venue_id,user,start)).fetchone()
         owner=conn.execute('SELECT owner_telegram_id,name FROM venues WHERE id=%s',(booking.venue_id,)).fetchone()
-        conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)',(owner['owner_telegram_id'],f'📅 Yangi bron #{row["id"]} — {owner["name"]} ({start.isoformat()}). /owner'))
+        conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)',(owner['owner_telegram_id'],f'📅 Yangi bron #{row["id"]} — {owner["name"]}\n🕒 {booking_time_label(start)}\n/owner'))
     return {'id':row['id'],'status':'pending'}
 
 @app.get('/bookings/me')

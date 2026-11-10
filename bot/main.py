@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import os
+from datetime import timedelta, timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command, CommandStart
@@ -48,7 +49,8 @@ async def owner(message: Message):
         await message.answer('Tasdiqlashni kutayotgan bronlar yo‘q.');return
     for r in rows:
         keyboard=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='✅ Tasdiqlash',callback_data=f'booking:confirmed:{r["id"]}'),InlineKeyboardButton(text='❌ Rad etish',callback_data=f'booking:rejected:{r["id"]}')]])
-        await message.answer(f'#{r["id"]} {r["name"]} — {r["start_at"]}',reply_markup=keyboard)
+        local_time=r['start_at'].astimezone(timezone(timedelta(hours=5))).strftime('%d.%m.%Y · %H:%M')
+        await message.answer(f'#{r["id"]} {r["name"]}\n🕒 {local_time} (Oʻzbekiston vaqti, UTC+5)',reply_markup=keyboard)
 
 @dp.message(Command('admin'))
 async def admin(message: Message):
