@@ -6,4 +6,5 @@ __pycache__/
 .venv/
 node_modules/
 dist/
+*.tsbuildinfo
 .DS_Store

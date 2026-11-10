@@ -4,7 +4,7 @@ import logging
 import os
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp
 from dotenv import load_dotenv
 import psycopg
 from psycopg.rows import dict_row
@@ -24,6 +24,8 @@ async def start(message: Message):
 
 @dp.message(Command('owner'))
 async def owner(message: Message):
+    keyboard=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏟 Maydon qoʻshish / mening maydonlarim',web_app=WebAppInfo(url=os.environ['MINI_APP_URL'].rstrip('/')+'/?owner=1'))]])
+    await message.answer('Oʻz maydoningizni rasmlar va xaritadagi joylashuvi bilan yuboring.',reply_markup=keyboard)
     with database() as conn:
         rows=conn.execute('SELECT b.id,v.name,b.start_at FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE v.owner_telegram_id=%s AND b.status=%s ORDER BY b.start_at LIMIT 10',(message.from_user.id,'pending')).fetchall()
     if not rows:
@@ -88,6 +90,7 @@ async def main():
     for name in ('BOT_TOKEN','DATABASE_URL','MINI_APP_URL'):
         if not os.getenv(name):raise RuntimeError(f'Missing {name}')
     bot=Bot(os.environ['BOT_TOKEN'])
+    await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text='MAYDONni ochish',web_app=WebAppInfo(url=os.environ['MINI_APP_URL'])))
     worker=asyncio.create_task(deliver_notifications(bot))
     try:
         await dp.start_polling(bot)
