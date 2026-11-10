@@ -1,4 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
+import {ImagePlus} from 'lucide-react';
 
 export const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 export const authHeaders = () => ({'X-Telegram-Init-Data': window.Telegram?.WebApp?.initData || ''});
@@ -109,11 +110,11 @@ export function OwnerForm({onSaved,onExpired}:{onSaved:()=>void;onExpired:()=>vo
   <label>Aloqa telefoni<input name="phone" type="tel" maxLength={40} required/></label>
   <label>Ish vaqti<input name="hours" placeholder="Masalan: 08:00–23:00" maxLength={120} required/></label>
   <LocationPicker onChange={setLocation}/>
-  <label>Maydon rasmlari (1–5 ta)<input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={processing} onChange={async event=>{
+  <label className="upload-label">Maydon rasmlari (1–5 ta)<span className="upload-zone"><ImagePlus size={29}/><strong>{processing?'Rasmlar tayyorlanmoqda…':'Rasmlarni tanlang'}</strong><small>JPEG, PNG yoki WebP · 10 MB gacha</small><input aria-label="Maydon rasmlarini tanlash" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={processing} onChange={async event=>{
    const files=Array.from(event.target.files||[]);event.target.value='';if(!files.length)return;
    if(photos.length+files.length>5){setError('Koʻpi bilan 5 ta rasm tanlang.');return;}setProcessing(true);setError('');
    try{const next:string[]=[];for(const file of files)next.push(await resizePhoto(file));setPhotos(old=>[...old,...next]);}catch(e){setError(e instanceof Error?e.message:'Rasm yuklanmadi.')}finally{setProcessing(false)}
-  }}/></label><p>Maydonning umumiy koʻrinishi, kirish joyi va oʻyin hududini koʻrsating. Shaxsiy hujjatlarni yuklamang. Rasmlar tasdiqlangach eʼlonda koʻrinadi.</p>
+  }}/></span></label><p>Maydonning umumiy koʻrinishi, kirish joyi va oʻyin hududini koʻrsating. Shaxsiy hujjatlarni yuklamang. Rasmlar tasdiqlangach eʼlonda koʻrinadi.</p>
   <div className="photos">{photos.map((photo,index)=><div key={index}><img src={`data:image/jpeg;base64,${photo}`} alt={`Maydon rasmi ${index+1}`}/><button type="button" disabled={processing} onClick={()=>setPhotos(old=>old.filter((_,i)=>i!==index))}>Oʻchirish</button></div>)}</div>
   <p role="status">{location?'✓ Joylashuv tanlandi':'○ Xaritadan yoki GPS orqali joylashuvni tanlang'} · {photos.length?`✓ ${photos.length} ta rasm tayyor`:'○ Kamida bitta rasm yuklang'}</p>
   <label className="consent"><input type="checkbox" required/>Bu maydonni boshqarishga va ushbu rasmlarni joylashga ruxsatim bor.</label>
