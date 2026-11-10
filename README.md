@@ -61,6 +61,10 @@ and [Dockerfile detection](https://docs.railway.com/builds/dockerfiles).
 5. Test using a real Telegram session; API rejects unverified user IDs and accepts signed Telegram WebApp initData.
 
 ## Booking rules
+- Booking uses clickable dates and hourly slots in Namangan time (UTC+5), independent of the device timezone.
+- `GET /venues/{id}/availability?day=YYYY-MM-DD` lists reserved/past slots without exposing customer information. Opening hours are displayed as supplied by the owner; they are not parsed or enforced yet.
+- The desktop Telegram sign-in link preserves the pitch and selected slot through `/start book_<venue>_<timestamp>`. Availability is checked again after sign-in and on booking conflicts.
+- The bot menu and new messages use a versioned Railway URL; the HTML entry page is served without caching. Telegram's separate Main Mini App **OPEN** launcher must also point to the Railway frontend in BotFather.
 - One-hour slots starting on the hour, up to 60 days ahead.
 - Pending or confirmed bookings block duplicate slots.
 - Owners can confirm/reject; users can cancel pending requests.
@@ -74,7 +78,7 @@ browser visits remain guests. `/auth/me` verifies Telegram's signed Mini App
 data before displaying an account. Set backend `BOT_USERNAME=maydontopbot`.
 
 Owners use Profile → Maydon egasi paneli (or `/owner` in the bot) to submit
-their pitch. Select a point on the map or use GPS, then confirm the location;
+their pitch. Select a point on the map or use GPS; the selected location is saved automatically,
 there are no manual address or coordinate inputs. Address lookup is automatic
 when available; coordinates remain usable if lookup fails. Directions links
 use the saved coordinates.

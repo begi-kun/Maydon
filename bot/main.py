@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import os
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp
@@ -13,18 +14,33 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 dp=Dispatcher()
 
+def web_app_url(**params):
+    url=urlsplit(os.environ['MINI_APP_URL'])
+    query=dict(parse_qsl(url.query))
+    query.update(v='20261110-desktop', **params)
+    return urlunsplit((url.scheme,url.netloc,url.path or '/',urlencode(query),''))
+
 def database():
     return psycopg.connect(os.environ['DATABASE_URL'],row_factory=dict_row)
 
 @dp.message(CommandStart())
 async def start(message: Message):
-    url=os.environ['MINI_APP_URL']
+    url=web_app_url()
+    payload=(message.text or '').split(maxsplit=1)
+    if len(payload)==2 and payload[1].startswith('book_'):
+        parts=payload[1][5:].split('_')
+        venue_id=parts[0]
+        if venue_id.isdigit():
+            arguments={'venue':venue_id}
+            if len(parts)==2 and parts[1].isdigit():
+                arguments['slot']=parts[1]
+            url=web_app_url(**arguments)
     keyboard=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏟 MAYDONni ochish',web_app=WebAppInfo(url=url))]])
     await message.answer('MAYDON — Namangan shahridagi futbol, stol tennisi va bilyard joylari.',reply_markup=keyboard)
 
 @dp.message(Command('owner'))
 async def owner(message: Message):
-    keyboard=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏟 Maydon qoʻshish / mening maydonlarim',web_app=WebAppInfo(url=os.environ['MINI_APP_URL'].rstrip('/')+'/?owner=1'))]])
+    keyboard=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏟 Maydon qoʻshish / mening maydonlarim',web_app=WebAppInfo(url=web_app_url(owner='1')))]])
     await message.answer('Oʻz maydoningizni rasmlar va xaritadagi joylashuvi bilan yuboring.',reply_markup=keyboard)
     with database() as conn:
         rows=conn.execute('SELECT b.id,v.name,b.start_at FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE v.owner_telegram_id=%s AND b.status=%s ORDER BY b.start_at LIMIT 10',(message.from_user.id,'pending')).fetchall()
@@ -90,7 +106,7 @@ async def main():
     for name in ('BOT_TOKEN','DATABASE_URL','MINI_APP_URL'):
         if not os.getenv(name):raise RuntimeError(f'Missing {name}')
     bot=Bot(os.environ['BOT_TOKEN'])
-    await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text='MAYDONni ochish',web_app=WebAppInfo(url=os.environ['MINI_APP_URL'])))
+    await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text='MAYDONni ochish',web_app=WebAppInfo(url=web_app_url())))
     worker=asyncio.create_task(deliver_notifications(bot))
     try:
         await dp.start_polling(bot)

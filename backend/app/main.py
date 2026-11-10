@@ -7,7 +7,7 @@ import time
 import base64
 import binascii
 from io import BytesIO
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time as day_time, timedelta, timezone
 from urllib.parse import parse_qsl
 from contextlib import contextmanager
 from typing import Literal
@@ -150,6 +150,26 @@ def venues(sport: str | None = None):
         if sport:
             return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE status=%s AND sport=%s ORDER BY id DESC', ('approved',sport)).fetchall()
         return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE status=%s ORDER BY id DESC', ('approved',)).fetchall()
+
+@app.get('/venues/{venue_id}/availability')
+def availability(venue_id: int, day: date):
+    local_zone = timezone(timedelta(hours=5))
+    now = datetime.now(timezone.utc)
+    start = datetime.combine(day, day_time(), tzinfo=local_zone)
+    if day < now.astimezone(local_zone).date() or day > (now + timedelta(days=60)).astimezone(local_zone).date():
+        raise HTTPException(422, 'Choose a date within the next 60 days')
+    with db() as conn:
+        venue = conn.execute('SELECT hours FROM venues WHERE id=%s AND status=%s', (venue_id, 'approved')).fetchone()
+        if not venue:
+            raise HTTPException(404, 'Venue not found')
+        busy = conn.execute("SELECT start_at FROM bookings WHERE venue_id=%s AND status IN ('pending','confirmed') AND start_at >= %s AND start_at < %s", (venue_id, start, start + timedelta(days=1))).fetchall()
+    reserved = {row['start_at'] for row in busy}
+    slots = []
+    for hour in range(24):
+        instant = start + timedelta(hours=hour)
+        status = 'past' if instant <= now + timedelta(minutes=5) else 'unavailable' if instant > now + timedelta(days=60) else 'booked' if instant in reserved else 'available'
+        slots.append({'start_at': instant.isoformat(), 'label': f'{hour:02}:00', 'status': status})
+    return {'day': day.isoformat(), 'timezone': 'Asia/Tashkent', 'hours': venue['hours'], 'slots': slots}
 
 @app.post('/venues', status_code=201)
 async def request_venue(request: Request, user: int = Depends(authenticate)):
