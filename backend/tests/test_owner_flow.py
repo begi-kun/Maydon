@@ -10,6 +10,7 @@ import unittest
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlencode
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -96,6 +97,27 @@ class OwnerIntegrationTests(unittest.TestCase):
         data = payload(); data['photos'].append('invalid')
         self.assertEqual(self.client.post('/venues', headers=headers(303), json=data).status_code, 422)
         self.assertEqual(self.client.get('/owner/venues', headers=headers(303)).json(), before)
+
+    def test_availability_uses_namangan_day_and_updates_after_cancel(self):
+        response = self.client.post('/venues', headers=headers(101), json=payload())
+        venue_id = response.json()['id']
+        day = (datetime.now(timezone(timedelta(hours=5))) + timedelta(days=1)).date().isoformat()
+        url = f'/venues/{venue_id}/availability?day={day}'
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.client.post(f'/admin/venues/{venue_id}/approved', headers=headers(999))
+        result = self.client.get(url).json()
+        self.assertEqual(result['timezone'], 'Asia/Tashkent')
+        self.assertEqual(len(result['slots']), 24)
+        slot = result['slots'][0]
+        self.assertEqual(slot['start_at'], day + 'T00:00:00+05:00')
+        self.assertEqual(slot['status'], 'available')
+        booking = self.client.post('/bookings', headers=headers(202), json={'venue_id': venue_id, 'start_at': slot['start_at']})
+        self.assertEqual(booking.status_code, 201, booking.text)
+        self.assertEqual(self.client.get(url).json()['slots'][0]['status'], 'booked')
+        self.assertEqual(self.client.get(url).json()['slots'][1]['status'], 'available')
+        self.client.post(f'/bookings/{booking.json()["id"]}/cancel', headers=headers(202))
+        self.assertEqual(self.client.get(url).json()['slots'][0]['status'], 'available')
+        self.assertEqual(self.client.get(f'/venues/{venue_id}/availability?day=2020-01-01').status_code, 422)
 
 if __name__ == '__main__':
     unittest.main()

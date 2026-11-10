@@ -59,12 +59,13 @@ function LocationPicker({onChange}:{onChange:(value:Location|null)=>void}) {
    } catch {/* The selected coordinates remain usable without geocoding. */}
   }
  };
- useEffect(()=>{active.current=true;loadMaps().then(ymaps=>{if(!active.current||!element.current)return;
+ useEffect(()=>{active.current=true;let observer:ResizeObserver|undefined;loadMaps().then(ymaps=>{if(!active.current||!element.current)return;
   map.current=new ymaps.Map(element.current,{center:[41.0011,71.6726],zoom:12,controls:['zoomControl']});
+  observer=new ResizeObserver(()=>map.current?.container.fitToViewport());observer.observe(element.current);
   map.current.events.add('click',(event:any)=>select.current(event.get('coords')));
   if(selectedCoords.current)showPin(selectedCoords.current);
  }).catch(e=>{if(active.current)setError(e.message)});
- return()=>{active.current=false;generation.current++;map.current?.destroy()};},[]);
+ return()=>{active.current=false;generation.current++;observer?.disconnect();map.current?.destroy()};},[]);
  function locate(){if(!navigator.geolocation){setError('GPS mavjud emas. Xaritadan nuqta tanlang.');return;}
   const version=++generation.current;
   setGps(true);navigator.geolocation.getCurrentPosition(p=>{if(!active.current||version!==generation.current)return;setGps(false);select.current([p.coords.latitude,p.coords.longitude]);},()=>{if(!active.current||version!==generation.current)return;setGps(false);setError('Joylashuvga ruxsat bering yoki xaritada maydonni bosing.');},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
