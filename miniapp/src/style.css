@@ -19,3 +19,5 @@
 @media(max-width:600px){.owner-sidebar{display:block}.owner-sidebar>.setting{margin:12px 0}.owner-layout,.detail-layout{grid-template-columns:minmax(0,1fr)}.app{padding-left:14px;padding-right:14px}.profile-links button>span{min-width:0}.profile-links small{overflow-wrap:anywhere}.booking-summary{flex-wrap:wrap}}
 
 .app{width:100%;max-width:1160px}@media(min-width:901px){.bottom-nav{position:absolute}}
+
+.delete-confirm{padding:14px;background:#fff4ed;border:1px solid #ead7ca;border-radius:12px;margin-top:14px}.delete-confirm p{font-size:11px}.booking-contact{border-top:1px solid var(--line);padding-top:1px;margin:22px 0}.booking-contact>p{font-size:11px;color:var(--muted);margin:12px 0}.booking-contact .secondary{font-size:11px;gap:8px}.booking-contact .inline-link,.booking-contact .back{font-size:10px;margin:12px 0}.contact-shared{display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;background:#edf4e4}.contact-shared strong{display:block;font-size:14px}.contact-shared small{display:block;font-size:9px;color:var(--muted);margin-top:4px}.venue-actions{margin-top:14px}

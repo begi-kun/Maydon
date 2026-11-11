@@ -61,6 +61,8 @@ and [Dockerfile detection](https://docs.railway.com/builds/dockerfiles).
 5. Test using a real Telegram session; API rejects unverified user IDs and accepts signed Telegram WebApp initData.
 
 ## Booking rules
+- New bookings require the customer's own Telegram contact. The bot accepts a contact only when its Telegram user ID matches the sender; typed numbers and another person's contact cannot satisfy this check. This is Telegram account association, not an SMS verification service or a guarantee against no-shows.
+- Customers share through the Mini App prompt or `/phone` in the private bot chat. The verified number is snapshotted on each new booking and shown only in that customer's history and the relevant owner's booking views/notifications. Older bookings have no saved number.
 - Booking uses clickable dates and hourly slots in Namangan time (UTC+5), independent of the device timezone.
 - `GET /venues/{id}/availability?day=YYYY-MM-DD` lists reserved/past slots without exposing customer information. Opening hours are displayed as supplied by the owner; they are not parsed or enforced yet.
 - The desktop Telegram sign-in link preserves the pitch and selected slot through `/start book_<venue>_<timestamp>`. Availability is checked again after sign-in and on booking conflicts.
@@ -89,6 +91,10 @@ Photos are stored in PostgreSQL, survive redeploys, and remain private to the
 owner and admin until approval. Admins review photos, location and the owner's
 Telegram ID. Photos are supporting evidence, not automatic ownership verification.
 Existing listings without photos remain readable.
+
+Owners can edit their own listing details, location, and photos from **Mening maydonlarim → Tahrirlash**. Edits require admin review again; existing bookings remain in place. The editor retains existing photos unless the owner removes them.
+
+**Oʻchirish** requires confirmation and hides the listing without deleting booking history. Future or ongoing pending/confirmed bookings block deletion. Archived listings cannot receive new bookings, edits, or admin approval.
 
 Deploy the bot as one persistent Railway service, root `bot`, with `BOT_TOKEN`,
 `DATABASE_URL`, `ADMIN_TELEGRAM_ID`, and `MINI_APP_URL` set to the Railway frontend.
