@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {ArrowRight, CalendarDays, Clock3, RefreshCw, Send} from 'lucide-react';
 import {API} from './owner';
+import {BookingContact} from './contact';
 
 const weekdays=['Yak','Du','Se','Chor','Pay','Ju','Sha'];
 const months=['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentabr','oktabr','noyabr','dekabr'];
@@ -9,6 +10,7 @@ type Slot={start_at:string;label:string;status:'available'|'booked'|'past'|'unav
 function localDate(date:Date){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tashkent',year:'numeric',month:'2-digit',day:'2-digit'}).format(date)}
 export function BookingPicker({venueId,price,authenticated,botUsername,busy,revision,onBook}:{venueId:number;price:number;authenticated:boolean;botUsername:string;busy:boolean;revision:number;onBook:(time:string)=>void}){
  const today=localDate(new Date());const maxDate=localDate(new Date(Date.now()+60*86400000));
+ const [contactPhone,setContactPhone]=useState<string|null>(null);
  const requested=Number(new URLSearchParams(window.location.search).get('slot'))*1000;
  const restore=useRef(requested>Date.now()&&requested<Date.now()+60*86400000?requested:0);
  const [day,setDay]=useState(restore.current?localDate(new Date(restore.current)):today);const [time,setTime]=useState('');const [slots,setSlots]=useState<Slot[]>([]);const [hours,setHours]=useState('');const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [retry,setRetry]=useState(0);
@@ -27,6 +29,6 @@ export function BookingPicker({venueId,price,authenticated,botUsername,busy,revi
   <p className="slot-hours"><Clock3 size={14}/> Ish vaqti: {hours||'Egasi bilan aniqlashtiring'}</p>
   {loading?<p className="slot-loading" role="status">Vaqtlar tekshirilmoqda…</p>:error?<div role="alert">{error}<button className="back" onClick={()=>setRetry(n=>n+1)}><RefreshCw size={14}/> Qayta yuklash</button></div>:<><div className="time-grid">{slots.map(slot=><button type="button" key={slot.start_at} disabled={busy||slot.status!=='available'} aria-pressed={time===slot.start_at} aria-label={`${slot.label}${slot.status==='booked'?' — band':slot.status!=='available'?' — mavjud emas':''}`} className={`${time===slot.start_at?'selected ':''}${slot.status==='booked'?'booked':''}`} onClick={()=>setTime(slot.start_at)}>{slot.label}{slot.status==='booked'&&<small>Band</small>}</button>)}</div><p className="field-help">Band vaqtlarni tanlab boʻlmaydi. Koʻrsatilgan ish vaqtiga mos soatni tanlang. Bron egasi tasdiqlagach kuchga kiradi.</p></>}
   {chosen&&<div className="booking-summary"><div><strong>{dateLabel(time)} · {chosen.label}</strong><span>1 soat</span></div><strong>{new Intl.NumberFormat('uz-UZ').format(price)} soʻm</strong></div>}
-  {authenticated?<button className="primary" disabled={!chosen||busy||loading} onClick={()=>onBook(time)}>{busy?'Yuborilmoqda…':chosen?'Bron soʻrovi yuborish':'Kunni va vaqtni tanlang'}<ArrowRight size={18}/></button>:<div className="booking-login"><p>Telegram hisobingiz bilan davom eting. Botdagi tugma sizni shu maydonga qaytaradi.</p>{botUsername?<a href={signIn} className="primary"><Send size={17}/> Telegramda bron qilish</a>:<p>Telegram botining menyusidan MAYDONni oching.</p>}</div>}
+  {authenticated?<><BookingContact venueId={venueId} time={time} botUsername={botUsername} onChange={setContactPhone}/><button className="primary" disabled={!chosen||!contactPhone||busy||loading} onClick={()=>onBook(time)}>{busy?'Yuborilmoqda…':!chosen?'Kunni va vaqtni tanlang':!contactPhone?'Avval telefon raqamingizni ulashing':'Bron soʻrovi yuborish'}<ArrowRight size={18}/></button></>:<div className="booking-login"><p>Telegram hisobingiz bilan davom eting. Botdagi tugma sizni shu maydonga qaytaradi.</p>{botUsername?<a href={signIn} className="primary"><Send size={17}/> Telegramda bron qilish</a>:<p>Telegram botining menyusidan MAYDONni oching.</p>}</div>}
  </div>;
 }

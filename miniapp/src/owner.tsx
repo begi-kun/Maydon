@@ -35,11 +35,12 @@ export function loadMaps():Promise<any> {
  });return mapsPromise;
 }
 type Location={latitude:number;longitude:number;address:string};
-function LocationPicker({onChange}:{onChange:(value:Location|null)=>void}) {
+export type OwnerVenue=Location & {id:number;name:string;sport:string;price:number;phone:string;hours:string;photos?:number[]};
+function LocationPicker({onChange,initial}:{onChange:(value:Location|null)=>void;initial?:Location}) {
  const element=useRef<HTMLDivElement>(null);const map=useRef<any>();const marker=useRef<any>();
- const [location,setLocation]=useState<Location|null>(null);const [error,setError]=useState('');const [gps,setGps]=useState(false);
+ const [location,setLocation]=useState<Location|null>(initial?{latitude:initial.latitude,longitude:initial.longitude,address:initial.address}:null);const [error,setError]=useState('');const [gps,setGps]=useState(false);
  const generation=useRef(0);const active=useRef(true);const callback=useRef(onChange);callback.current=onChange;
- const selectedCoords=useRef<number[]|null>(null);
+ const selectedCoords=useRef<number[]|null>(initial?[initial.latitude,initial.longitude]:null);
  const select=useRef((coords:number[])=>{});
  function showPin(coords:number[]){
   if(!map.current||!window.ymaps)return;
@@ -88,38 +89,49 @@ async function resizePhoto(file:File):Promise<string> {
  }finally{image.close()}
 }
 
-export function OwnerForm({onSaved,onExpired}:{onSaved:()=>void;onExpired:()=>void}) {
- const [location,setLocation]=useState<Location|null>(null);const [photos,setPhotos]=useState<string[]>([]);const [busy,setBusy]=useState(false);const [processing,setProcessing]=useState(false);const [error,setError]=useState('');const [saved,setSaved]=useState(false);
+export function OwnerForm({onSaved,onExpired,initial,onCancel}:{onSaved:()=>void;onExpired:()=>void;initial?:OwnerVenue;onCancel?:()=>void}) {
+ const [kept,setKept]=useState<number[]>(initial?.photos||[]);
+ const [location,setLocation]=useState<Location|null>(initial?{latitude:initial.latitude,longitude:initial.longitude,address:initial.address}:null);const [photos,setPhotos]=useState<string[]>([]);const [busy,setBusy]=useState(false);const [processing,setProcessing]=useState(false);const [error,setError]=useState('');const [saved,setSaved]=useState(false);
  async function submit(event:React.FormEvent<HTMLFormElement>){event.preventDefault();
   if(busy||processing)return;
   const form=event.currentTarget;
   if(!form.checkValidity()){setError('Majburiy maydonlarni toʻldiring va maydonni boshqarishga ruxsatingiz borligini belgilang.');form.reportValidity();return;}
   if(!location){setError('Maydon joylashuvini xaritada bosing yoki “Hozirgi joylashuvim” tugmasidan foydalaning.');return;}
-  if(!photos.length){setError('Maydonning kamida bitta rasmini yuklang.');return;}
+  if(!photos.length&&!kept.length){setError('Maydonning kamida bitta rasmini yuklang.');return;}
   const data=new FormData(form);setBusy(true);setError('');
-  try{const response=await fetch(`${API}/venues`,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({...Object.fromEntries(data.entries()),price:Number(data.get('price')),...location,photos})});
+  try{const response=await fetch(initial?`${API}/owner/venues/${initial.id}/edit`:`${API}/venues`,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({...Object.fromEntries(data.entries()),price:Number(data.get('price')),...location,photos,...(initial?{keep_photos:kept}:{})})});
    if(response.status===401){onExpired();throw Error('Kirish muddati tugadi. Ilovani Telegramdan qayta oching.');}
    if(!response.ok){const body=await response.json();throw Error(typeof body.detail==='string'?body.detail:'Maʼlumotlarni tekshiring.');}
    setSaved(true);onSaved();
   }catch(e){setError(e instanceof Error?e.message:'Yuborilmadi. Qayta urinib koʻring.')}finally{setBusy(false)}
  }
  if(saved)return <div className="setting" role="status"><h4>✓ Ariza yuborildi</h4><p>Maydoningiz va rasmlaringiz admin tekshiruvida. Tasdiqlangandan keyin ommaga koʻrinadi.</p><button onClick={()=>{setSaved(false);setPhotos([]);setLocation(null)}}>Yana maydon qoʻshish</button></div>;
- return <form onSubmit={submit} noValidate><fieldset disabled={busy}><h4>Yangi maydon qoʻshish</h4>
-  <label>Maydon nomi<input name="name" required minLength={2} maxLength={120}/></label>
-  <label>Sport<select name="sport"><option value="football">Futbol</option><option value="table_tennis">Stol tennisi</option><option value="billiards">Bilyard</option></select></label>
-  <label>Bir soat narxi (soʻm)<input name="price" type="number" min={0} max={100000000} step={1} required/></label>
-  <label>Aloqa telefoni<input name="phone" type="tel" maxLength={40} required/></label>
-  <label>Ish vaqti<input name="hours" placeholder="Masalan: 08:00–23:00" maxLength={120} required/></label>
-  <LocationPicker onChange={setLocation}/>
+ return <form onSubmit={submit} noValidate><fieldset disabled={busy}><h4>{initial?'Maydonni tahrirlash':'Yangi maydon qoʻshish'}</h4>{initial&&<><p>Oʻzgarishlar admin tekshiruviga yuboriladi. Mavjud bronlar saqlanadi.</p><button type="button" className="back" onClick={onCancel}>Tahrirni bekor qilish</button></>}
+  <label>Maydon nomi<input name="name" defaultValue={initial?.name} required minLength={2} maxLength={120}/></label>
+  <label>Sport<select name="sport" defaultValue={initial?.sport||'football'}><option value="football">Futbol</option><option value="table_tennis">Stol tennisi</option><option value="billiards">Bilyard</option></select></label>
+  <label>Bir soat narxi (soʻm)<input name="price" defaultValue={initial?.price} type="number" min={0} max={100000000} step={1} required/></label>
+  <label>Aloqa telefoni<input name="phone" defaultValue={initial?.phone} type="tel" maxLength={40} required/></label>
+  <label>Ish vaqti<input name="hours" defaultValue={initial?.hours} placeholder="Masalan: 08:00–23:00" maxLength={120} required/></label>
+  <LocationPicker onChange={setLocation} initial={initial}/>
   <label className="upload-label">Maydon rasmlari (1–5 ta)<span className="upload-zone"><ImagePlus size={29}/><strong>{processing?'Rasmlar tayyorlanmoqda…':'Rasmlarni tanlang'}</strong><small>JPEG, PNG yoki WebP · 10 MB gacha</small><input aria-label="Maydon rasmlarini tanlash" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={processing} onChange={async event=>{
    const files=Array.from(event.target.files||[]);event.target.value='';if(!files.length)return;
-   if(photos.length+files.length>5){setError('Koʻpi bilan 5 ta rasm tanlang.');return;}setProcessing(true);setError('');
+   if(kept.length+photos.length+files.length>5){setError('Koʻpi bilan 5 ta rasm tanlang.');return;}setProcessing(true);setError('');
    try{const next:string[]=[];for(const file of files)next.push(await resizePhoto(file));setPhotos(old=>[...old,...next]);}catch(e){setError(e instanceof Error?e.message:'Rasm yuklanmadi.')}finally{setProcessing(false)}
   }}/></span></label><p>Maydonning umumiy koʻrinishi, kirish joyi va oʻyin hududini koʻrsating. Shaxsiy hujjatlarni yuklamang. Rasmlar tasdiqlangach eʼlonda koʻrinadi.</p>
-  <div className="photos">{photos.map((photo,index)=><div key={index}><img src={`data:image/jpeg;base64,${photo}`} alt={`Maydon rasmi ${index+1}`}/><button type="button" disabled={processing} onClick={()=>setPhotos(old=>old.filter((_,i)=>i!==index))}>Oʻchirish</button></div>)}</div>
-  <p role="status">{location?'✓ Joylashuv tanlandi':'○ Xaritadan yoki GPS orqali joylashuvni tanlang'} · {photos.length?`✓ ${photos.length} ta rasm tayyor`:'○ Kamida bitta rasm yuklang'}</p>
+  <div className="photos">{kept.map(id=><div key={id}><PitchPhoto id={id}/><button type="button" onClick={()=>setKept(old=>old.filter(value=>value!==id))}>Oʻchirish</button></div>)}{photos.map((photo,index)=><div key={index}><img src={`data:image/jpeg;base64,${photo}`} alt={`Maydon rasmi ${index+1}`}/><button type="button" disabled={processing} onClick={()=>setPhotos(old=>old.filter((_,i)=>i!==index))}>Oʻchirish</button></div>)}</div>
+  <p role="status">{location?'✓ Joylashuv tanlandi':'○ Xaritadan yoki GPS orqali joylashuvni tanlang'} · {photos.length+kept.length?`✓ ${photos.length+kept.length} ta rasm tayyor`:'○ Kamida bitta rasm yuklang'}</p>
   <label className="consent"><input type="checkbox" required/>Bu maydonni boshqarishga va ushbu rasmlarni joylashga ruxsatim bor.</label>
   {error&&<p role="alert">{error}</p>}
-  <button className="primary" disabled={busy||processing}>{busy?'Yuborilmoqda…':processing?'Rasmlar tayyorlanmoqda…':'Admin tekshiruviga yuborish'}</button>
+  <button className="primary" disabled={busy||processing}>{busy?'Yuborilmoqda…':processing?'Rasmlar tayyorlanmoqda…':initial?'Oʻzgarishlarni yuborish':'Admin tekshiruviga yuborish'}</button>
  </fieldset></form>;
+}
+
+export function OwnerVenueActions({venue,onEdit,onDeleted}:{venue:OwnerVenue;onEdit:()=>void;onDeleted:()=>void}){
+ const [confirm,setConfirm]=useState(false);const [busy,setBusy]=useState(false);const [error,setError]=useState('');
+ async function remove(){setBusy(true);setError('');try{
+  const response=await fetch(`${API}/owner/venues/${venue.id}/delete`,{method:'POST',headers:authHeaders()});
+  if(!response.ok){const body=await response.json();throw Error(typeof body.detail==='string'?body.detail:'Maydon oʻchirilmadi.');}
+  onDeleted();
+ }catch(e){setError(e instanceof Error?e.message:'Qayta urinib koʻring.')}finally{setBusy(false)}}
+ return <div className="venue-actions">{!confirm?<div className="decision-actions"><button onClick={onEdit}>Tahrirlash</button><button onClick={()=>setConfirm(true)}>Oʻchirish</button></div>:<div className="delete-confirm" role="alertdialog" aria-label="Maydonni oʻchirish"><p><strong>{venue.name}</strong> eʼlonini oʻchirmoqchimisiz? Bronlar tarixi saqlanadi. Faol kelgusi bronlar boʻlsa, oʻchirish mumkin emas.</p><div className="decision-actions"><button disabled={busy} onClick={()=>{setConfirm(false);setError('')}}>Bekor qilish</button><button disabled={busy} onClick={remove}>{busy?'Oʻchirilmoqda…':'Ha, oʻchirish'}</button></div></div>}{error&&<p role="alert">{error}</p>}</div>;
 }
