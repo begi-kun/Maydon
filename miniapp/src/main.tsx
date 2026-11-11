@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {House, Search, MapPin, UserRound, CalendarDays, ArrowUpRight, ArrowLeft, ArrowRight, Clock3, Phone, ShieldCheck, Plus, RefreshCw, X, Check, Compass, Goal, SlidersHorizontal, Send} from 'lucide-react';
 import './style.css';
+import {sportMarkerOptions} from './sport-markers';
 import {BookingPicker} from './booking';
 import {OwnerForm, OwnerVenueActions, PhotoGallery, directions, mapLocation, loadMaps, API, authHeaders} from './owner';
 
@@ -19,7 +20,7 @@ function Empty({title,children,action}:{title:string;children:React.ReactNode;ac
 function PitchArt(){return <div className="pitch-art" aria-hidden="true"><div className="pitch-lines"><i className="pitch-center"/><i className="pitch-box left"/><i className="pitch-box right"/></div></div>}
 function MapView({venues}:{venues:Venue[]}){
  const [error,setError]=useState('');
- useEffect(()=>{let active=true;let map:any;let observer:ResizeObserver;loadMaps().then(ymaps=>{if(!active)return;map=new ymaps.Map('maydon-map',{center:[41.0011,71.6726],zoom:12,controls:['zoomControl']});observer=new ResizeObserver(()=>map.container.fitToViewport());observer.observe(document.getElementById('maydon-map')!);venues.forEach(v=>map.geoObjects.add(new ymaps.Placemark([v.latitude,v.longitude])));}).catch(e=>{if(active)setError(e.message)});return()=>{active=false;observer?.disconnect();map?.destroy()};},[venues]);
+ useEffect(()=>{let active=true;let map:any;let observer:ResizeObserver;loadMaps().then(ymaps=>{if(!active)return;map=new ymaps.Map('maydon-map',{center:[41.0011,71.6726],zoom:12,controls:['zoomControl']});observer=new ResizeObserver(()=>map.container.fitToViewport());observer.observe(document.getElementById('maydon-map')!);venues.forEach(v=>map.geoObjects.add(new ymaps.Placemark([v.latitude,v.longitude],{},sportMarkerOptions(v.sport))));}).catch(e=>{if(active)setError(e.message)});return()=>{active=false;observer?.disconnect();map?.destroy()};},[venues]);
  return <div className="mapwrap">{error?<Empty title="Xarita yuklanmadi">{error}</Empty>:<div id="maydon-map" className="map"/>}</div>
 }
 function App(){
