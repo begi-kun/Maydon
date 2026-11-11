@@ -8,6 +8,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from contacts import verified_contact_phone
+from reminders import queue_reminders, pending_notifications, reminder_is_current
 from dotenv import load_dotenv
 import psycopg
 from psycopg.rows import dict_row
@@ -128,14 +129,21 @@ async def deliver_notifications(bot:Bot):
     while True:
         try:
             with database() as conn:
-                rows=conn.execute('SELECT id,recipient_id,body FROM notifications WHERE sent_at IS NULL ORDER BY id LIMIT 30').fetchall()
+                queue_reminders(conn)
+                rows=pending_notifications(conn)
             for r in rows:
                 try:
+                    if r['reminder_booking_id'] is not None:
+                        with database() as conn:
+                            if not reminder_is_current(conn,r['reminder_booking_id']):
+                                continue
                     await bot.send_message(r['recipient_id'],r['body'])
                     with database() as conn:
                         conn.execute('UPDATE notifications SET sent_at=NOW() WHERE id=%s AND sent_at IS NULL',(r['id'],))
                 except Exception as exc:
                     logging.warning('Could not deliver notification %s: %s',r['id'],exc)
+                    with database() as conn:
+                        conn.execute("UPDATE notifications SET retry_after=NOW() + INTERVAL '1 minute' WHERE id=%s AND sent_at IS NULL",(r['id'],))
         except Exception:
             logging.exception('Notification polling failed')
         await asyncio.sleep(15)

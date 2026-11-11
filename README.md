@@ -101,6 +101,18 @@ Deploy the bot as one persistent Railway service, root `bot`, with `BOT_TOKEN`,
 The worker configures the Telegram menu button on startup. CLI deployment:
 `railway up bot --path-as-root -s Maydon-bot --detach`.
 
+Confirmed bookings receive a Telegram reminder one hour before the start, with
+the booking number, venue, address, and Uzbekistan local time. The bot checks
+every 15 seconds. Confirmation within that hour or a worker restart triggers a
+catch-up reminder only while the booking is still in the future. Pending,
+rejected, cancelled, and past bookings do not receive reminders.
+
+Deploy the backend before the bot for this update: backend startup adds the
+reminder reference and retry timestamp to the notification table. Each booking
+can queue one reminder; transient delivery failures retry after one minute.
+Run one bot worker. Delivery remains at least once: a crash after Telegram accepts
+a message but before its sent timestamp is saved can cause a duplicate.
+
 Backend checks (use an empty disposable PostgreSQL database): install
 `backend/requirements.txt` and `httpx`, then run
 `TEST_DATABASE_URL=postgresql://... python -m unittest discover -s backend/tests -v`.
