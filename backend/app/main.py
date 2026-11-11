@@ -139,6 +139,10 @@ CREATE TABLE IF NOT EXISTS bookings (
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE UNIQUE INDEX IF NOT EXISTS bookings_one_active_slot ON bookings(venue_id,start_at) WHERE status IN ('pending','confirmed');
 CREATE TABLE IF NOT EXISTS notifications (id BIGSERIAL PRIMARY KEY, recipient_id BIGINT NOT NULL, body TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), sent_at TIMESTAMPTZ);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reminder_booking_id BIGINT REFERENCES bookings(id);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS retry_after TIMESTAMPTZ NOT NULL DEFAULT NOW();
+CREATE UNIQUE INDEX IF NOT EXISTS notifications_one_booking_reminder ON notifications(reminder_booking_id);
+CREATE INDEX IF NOT EXISTS bookings_confirmed_start ON bookings(start_at) WHERE status='confirmed';
 CREATE INDEX IF NOT EXISTS bookings_venue_start ON bookings(venue_id,start_at);
 CREATE INDEX IF NOT EXISTS bookings_user ON bookings(user_telegram_id);
 CREATE TABLE IF NOT EXISTS venue_photos (
