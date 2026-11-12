@@ -64,7 +64,7 @@ and [Dockerfile detection](https://docs.railway.com/builds/dockerfiles).
 - New bookings require the customer's own Telegram contact. The bot accepts a contact only when its Telegram user ID matches the sender; typed numbers and another person's contact cannot satisfy this check. This is Telegram account association, not an SMS verification service or a guarantee against no-shows.
 - Customers share through the Mini App prompt or `/phone` in the private bot chat. The verified number is snapshotted on each new booking and shown only in that customer's history and the relevant owner's booking views/notifications. Older bookings have no saved number.
 - Booking uses clickable dates and hourly slots in Namangan time (UTC+5), independent of the device timezone.
-- `GET /venues/{id}/availability?day=YYYY-MM-DD` lists reserved/past slots without exposing customer information. Opening hours are displayed as supplied by the owner; they are not parsed or enforced yet.
+- `GET /venues/{id}/availability?day=YYYY-MM-DD` lists reserved/past slots without exposing customer information. Opening hours are enforced for complete one-hour slots in Uzbekistan time.
 - The desktop Telegram sign-in link preserves the pitch and selected slot through `/start book_<venue>_<timestamp>`. Availability is checked again after sign-in and on booking conflicts.
 - The bot menu and new messages use a versioned Railway URL; the HTML entry page is served without caching. Telegram's separate Main Mini App **OPEN** launcher must also point to the Railway frontend in BotFather.
 - One-hour slots starting on the hour, up to 60 days ahead.
@@ -148,3 +148,50 @@ the Mini App to collect a reason.
 Deploy the backend first to apply the additive database schema changes, then
 update the frontend and bot. Tests use a disposable PostgreSQL database:
 `TEST_DATABASE_URL=postgresql://... python -m unittest discover -s backend/tests -v`.
+
+## Admin and owner analytics
+
+Admins open **Tahlil** in the admin panel; owners see **Maydonlaringiz tahlili**
+in their panel. Reports cover booking status counts and percentages, confirmed
+hours (one hour per booking), unique Telegram customers, confirmed booking
+value, trends, and per-venue results. Filters support today, 7/30 days, all time,
+a custom range of up to 366 days, and a single venue. Dates refer to the booking
+start in Uzbekistan time. All-time reports include future bookings. Archived
+venues remain included, and totals are computed from the full database history,
+independently of paginated management lists. Trends group by day for up to 91
+days and month for longer/all-time periods; dates without bookings are omitted.
+Owners can only query their own venues, including through the API.
+
+New bookings snapshot the venue price in `booked_price`. Confirmed booking value
+is not collected revenue: these totals use booking prices, not payment amounts. Older bookings with
+no saved price are excluded from monetary totals and counted explicitly as
+missing prices; they still contribute to booking counts. No historical prices
+are inferred from current venue prices. Deploy the backend before the frontend.
+
+## Owner operations
+
+The owner panel opens on the daily schedule, with a seven-day view, booking
+history/search, payment status, venue management and analytics tabs. The overview
+shows today's active bookings/value, future pending requests and unpaid confirmed
+bookings. History uses server-side date, venue, status and customer filters with
+50 records per page.
+
+Owners can record phone/walk-in bookings or block individual one-hour slots.
+Customer requests, manual bookings and blocks share a venue lock to prevent
+conflicts. Manual bookings snapshot the current price, are confirmed immediately,
+and have no Telegram customer identity or automated customer reminders. Owners
+can cancel future manual bookings and reopen blocked slots. Block reasons and
+customer details are never exposed by public availability.
+
+Daily opening hours accept `08:00–23:00`, overnight `18:00–02:00`, or `24/7`.
+Only whole hours are supported. Both availability and booking creation enforce
+the hours. Updates that exclude existing active bookings are rejected. Legacy
+empty hours retain all-day availability; unrecognized legacy text closes online
+slots until the owner saves valid hours. Hours can be changed directly without
+resubmitting the listing for moderation.
+
+Payment tracking records unpaid/deposit/paid states on confirmed bookings, with
+an owner/timestamp audit history. It does not collect money, record deposit
+amounts, or issue refunds. Cancelled bookings retain their payment state.
+Deploy the backend schema and updated bot reminder worker before enabling the new
+frontend; manual bookings have a nullable Telegram customer ID.

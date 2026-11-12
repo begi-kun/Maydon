@@ -111,7 +111,7 @@ export function OwnerForm({onSaved,onExpired,initial,onCancel}:{onSaved:()=>void
   <label>Sport<select name="sport" defaultValue={initial?.sport||'football'}><option value="football">Futbol</option><option value="table_tennis">Stol tennisi</option><option value="billiards">Bilyard</option></select></label>
   <label>Bir soat narxi (soʻm)<input name="price" defaultValue={initial?.price} type="number" min={0} max={100000000} step={1} required/></label>
   <label>Aloqa telefoni<input name="phone" defaultValue={initial?.phone} type="tel" maxLength={40} required/></label>
-  <label>Ish vaqti<input name="hours" defaultValue={initial?.hours} placeholder="Masalan: 08:00–23:00" maxLength={120} required/></label>
+  <label>Ish vaqti<input name="hours" defaultValue={initial?.hours} placeholder="08:00–23:00 yoki 24/7" maxLength={120} required/></label>
   <LocationPicker onChange={setLocation} initial={initial}/>
   <label className="upload-label">Maydon rasmlari (1–5 ta)<span className="upload-zone"><ImagePlus size={29}/><strong>{processing?'Rasmlar tayyorlanmoqda…':'Rasmlarni tanlang'}</strong><small>JPEG, PNG yoki WebP · 10 MB gacha</small><input aria-label="Maydon rasmlarini tanlash" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={processing} onChange={async event=>{
    const files=Array.from(event.target.files||[]);event.target.value='';if(!files.length)return;

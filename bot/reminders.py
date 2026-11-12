@@ -18,7 +18,7 @@ def queue_reminders(conn):
     bookings = conn.execute('''
         SELECT b.id,b.user_telegram_id,b.start_at,v.name,v.address
         FROM bookings b JOIN venues v ON v.id=b.venue_id
-        WHERE b.status='confirmed' AND b.start_at > NOW()
+        WHERE b.status='confirmed' AND b.user_telegram_id IS NOT NULL AND b.start_at > NOW()
           AND b.start_at <= NOW() + INTERVAL '1 hour'
           AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.reminder_booking_id=b.id)
         ORDER BY b.start_at,b.id LIMIT 100
