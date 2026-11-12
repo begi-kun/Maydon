@@ -22,6 +22,9 @@ class ReminderIntegrationTests(unittest.TestCase):
         self.conn = psycopg.connect(main.DATABASE_URL, row_factory=dict_row)
         self.conn.execute(main.SCHEMA)
         self.conn.commit()
+        # Isolate the delivery batch from notifications left by other test classes.
+        # This change rolls back with the reminder test transaction.
+        self.conn.execute("UPDATE notifications SET sent_at=NOW() WHERE sent_at IS NULL")
         self.venue = self.conn.execute("""INSERT INTO venues
             (name,sport,address,latitude,longitude,price,owner_telegram_id,status)
             VALUES ('Reminder pitch','football','Namangan',41,71,100000,999,'approved') RETURNING id""").fetchone()['id']
