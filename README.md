@@ -125,3 +125,26 @@ Frontend check: run `npm ci && npm run build` in `miniapp/`.
 # Maydon
 # Maydon
 # Maydon
+
+## Admin venue and booking management
+
+Profile → Admin panel now includes searchable venues (all, pending, approved,
+rejected, suspended and archived) and bookings filtered by Uzbekistan calendar
+date, status, venue ID or booking ID. Lists use pages of 50 records.
+
+Rejections require a reason, saved on the venue and sent to its owner. Owners
+see the reason in their panel; submitting an edit clears it for the next review.
+Suspension hides a venue and blocks new bookings independently of approval;
+editing or approving a suspended venue does not lift the suspension. Existing
+bookings remain intact. Archived venues remain inspectable by admins.
+
+Admins can cancel future pending or confirmed bookings with a required reason.
+The slot becomes available and notifications are queued for both customer and
+owner. Repeated cancellation is rejected. Venue decisions, suspensions,
+reopening and admin cancellations are recorded with the acting admin ID,
+reason and timestamp in `admin_actions`. The bot directs venue rejections to
+the Mini App to collect a reason.
+
+Deploy the backend first to apply the additive database schema changes, then
+update the frontend and bot. Tests use a disposable PostgreSQL database:
+`TEST_DATABASE_URL=postgresql://... python -m unittest discover -s backend/tests -v`.

@@ -112,9 +112,13 @@ async def decide(call):
                 if row:
                     conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)',(row['user_telegram_id'],f'📅 Bron #{item_id}: {decision}.'))
         elif kind=='venue' and decision in ('approved','rejected') and str(call.from_user.id)==os.environ.get('ADMIN_TELEGRAM_ID'):
+            if decision == 'rejected':
+                await call.answer('Rad etish sababini kiritish uchun Mini App → Profil → Admin panelini oching.', show_alert=True)
+                return
             with database() as conn:
                 row=conn.execute("UPDATE venues SET status=%s WHERE id=%s AND status='pending' AND deleted_at IS NULL RETURNING owner_telegram_id,name",(decision,item_id)).fetchone()
                 if row:
+                    conn.execute("INSERT INTO admin_actions(admin_id,entity_type,entity_id,action) VALUES (%s,'venue',%s,%s)", (call.from_user.id,item_id,decision))
                     conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)',(row['owner_telegram_id'],f'🏟 {row["name"]}: ariza {decision}.'))
         else:
             await call.answer('Ruxsat yo‘q',show_alert=True);return

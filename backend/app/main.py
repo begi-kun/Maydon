@@ -14,9 +14,9 @@ from typing import Literal
 
 import psycopg
 from psycopg.rows import dict_row
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 from PIL import Image, ImageOps, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
 
@@ -121,6 +121,14 @@ def prepare_photo(encoded: str) -> bytes:
     except (ValueError, binascii.Error, UnidentifiedImageError, OSError, Image.DecompressionBombError):
         raise HTTPException(422, 'Upload valid JPEG, PNG or WebP pitch photos, at least 200 pixels per side')
 
+class AdminReason(BaseModel):
+    reason: str = Field(min_length=3, max_length=500)
+
+    @field_validator('reason', mode='before')
+    @classmethod
+    def trim_reason(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
 class BookingIn(BaseModel):
     venue_id: int
     start_at: datetime
@@ -150,6 +158,13 @@ CREATE TABLE IF NOT EXISTS venue_photos (
  image BYTEA NOT NULL);
 CREATE INDEX IF NOT EXISTS venue_photos_venue ON venue_photos(venue_id);
 ALTER TABLE venues ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS suspended BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS review_reason TEXT;
+CREATE TABLE IF NOT EXISTS admin_actions (
+ id BIGSERIAL PRIMARY KEY, admin_id BIGINT NOT NULL, entity_type TEXT NOT NULL,
+ entity_id BIGINT NOT NULL, action TEXT NOT NULL, reason TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS customer_phone TEXT;
 CREATE TABLE IF NOT EXISTS telegram_contacts (
  telegram_id BIGINT PRIMARY KEY, phone TEXT NOT NULL, shared_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
@@ -174,8 +189,8 @@ def health():
 def venues(sport: str | None = None):
     with db() as conn:
         if sport:
-            return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE deleted_at IS NULL AND status=%s AND sport=%s ORDER BY id DESC', ('approved',sport)).fetchall()
-        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE deleted_at IS NULL AND status=%s ORDER BY id DESC', ('approved',)).fetchall()
+            return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE deleted_at IS NULL AND NOT suspended AND status=%s AND sport=%s ORDER BY id DESC', ('approved',sport)).fetchall()
+        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE deleted_at IS NULL AND NOT suspended AND status=%s ORDER BY id DESC', ('approved',)).fetchall()
 
 @app.get('/venues/{venue_id}/availability')
 def availability(venue_id: int, day: date):
@@ -185,7 +200,7 @@ def availability(venue_id: int, day: date):
     if day < now.astimezone(local_zone).date() or day > (now + timedelta(days=60)).astimezone(local_zone).date():
         raise HTTPException(422, 'Choose a date within the next 60 days')
     with db() as conn:
-        venue = conn.execute('SELECT hours FROM venues WHERE deleted_at IS NULL AND id=%s AND status=%s', (venue_id, 'approved')).fetchone()
+        venue = conn.execute('SELECT hours FROM venues WHERE deleted_at IS NULL AND NOT suspended AND id=%s AND status=%s', (venue_id, 'approved')).fetchone()
         if not venue:
             raise HTTPException(404, 'Venue not found')
         busy = conn.execute("SELECT start_at FROM bookings WHERE venue_id=%s AND status IN ('pending','confirmed') AND start_at >= %s AND start_at < %s", (venue_id, start, start + timedelta(days=1))).fetchall()
@@ -230,7 +245,7 @@ def update_venue(venue_id: int, venue: VenueEdit, user: int):
         if not set(kept).issubset(existing):
             raise HTTPException(422, 'Photo does not belong to this pitch')
         photos = [prepare_photo(photo) for photo in venue.photos]
-        conn.execute("UPDATE venues SET name=%s,sport=%s,address=%s,latitude=%s,longitude=%s,price=%s,phone=%s,hours=%s,status='pending' WHERE id=%s", (*venue.model_dump(exclude={'photos', 'keep_photos'}).values(), venue_id))
+        conn.execute("UPDATE venues SET name=%s,sport=%s,address=%s,latitude=%s,longitude=%s,price=%s,phone=%s,hours=%s,status='pending',review_reason=NULL WHERE id=%s", (*venue.model_dump(exclude={'photos', 'keep_photos'}).values(), venue_id))
         conn.execute('DELETE FROM venue_photos WHERE venue_id=%s AND NOT (id = ANY(%s::bigint[]))', (venue_id, kept))
         for photo in photos:
             conn.execute('INSERT INTO venue_photos(venue_id,image) VALUES (%s,%s)', (venue_id, photo))
@@ -264,28 +279,91 @@ def save_venue(venue: VenueIn, user: int):
 @app.get('/photos/{photo_id}')
 def get_photo(photo_id: int, init_data: str = Header(default='', alias='X-Telegram-Init-Data')):
     with db() as conn:
-        row = conn.execute('SELECT p.image,v.status,v.owner_telegram_id FROM venue_photos p JOIN venues v ON v.id=p.venue_id WHERE p.id=%s AND v.deleted_at IS NULL', (photo_id,)).fetchone()
+        row = conn.execute('SELECT p.image,v.status,v.owner_telegram_id,v.suspended,v.deleted_at FROM venue_photos p JOIN venues v ON v.id=p.venue_id WHERE p.id=%s', (photo_id,)).fetchone()
     if not row:
         raise HTTPException(404, 'Photo not found')
-    if row['status'] != 'approved':
+    if row['status'] != 'approved' or row['suspended'] or row['deleted_at']:
         user = telegram_identity(init_data)['id']
         if user != row['owner_telegram_id'] and str(user) != ADMIN_ID:
             raise HTTPException(404, 'Photo not found')
     return Response(bytes(row['image']), media_type='image/jpeg', headers={'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff'})
 
+def audit(conn, actor, entity, item_id, action, reason=None):
+    conn.execute('INSERT INTO admin_actions(admin_id,entity_type,entity_id,action,reason) VALUES (%s,%s,%s,%s,%s)',
+                 (actor, entity, item_id, action, reason))
+
 @app.get('/admin/venues')
-def pending_venues(_: int = Depends(admin)):
+def admin_venues(response: Response, status: Literal['all','pending','approved','rejected','suspended','archived'] = 'pending',
+                 q: str = Query(default='', max_length=120), offset: int = Query(default=0, ge=0), _: int = Depends(admin)):
+    response.headers['Cache-Control'] = 'private, no-store'
+    clauses, params = [], []
+    if status == 'archived':
+        clauses.append('deleted_at IS NOT NULL')
+    elif status != 'all':
+        clauses.append('deleted_at IS NULL')
+        if status == 'suspended':
+            clauses.append('suspended')
+        else:
+            clauses.append('status=%s'); params.append(status)
+    if q.strip():
+        clauses.append("(name ILIKE %s OR address ILIKE %s OR id::text=%s OR owner_telegram_id::text=%s)")
+        params.extend([f'%{q.strip()}%', f'%{q.strip()}%', q.strip(), q.strip()])
+    where = ' AND '.join(clauses) or 'TRUE'
     with db() as conn:
-        return conn.execute("SELECT *, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE deleted_at IS NULL AND status='pending' ORDER BY id").fetchall()
+        return conn.execute(f"SELECT *, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE {where} ORDER BY id DESC LIMIT 50 OFFSET %s", (*params, offset)).fetchall()
 
 @app.post('/admin/venues/{venue_id}/{decision}')
-def decide_venue(venue_id: int, decision: Literal['approved','rejected'], _: int = Depends(admin)):
+def decide_venue(venue_id: int, decision: Literal['approved','rejected','suspend','resume'],
+                 body: AdminReason | None = None, actor: int = Depends(admin)):
+    if decision in ('rejected', 'suspend') and body is None:
+        raise HTTPException(422, 'Sababni kiriting (3–500 belgi).')
+    reason = body.reason if body else None
     with db() as conn:
-        row = conn.execute('UPDATE venues SET status=%s WHERE id=%s AND status=%s AND deleted_at IS NULL RETURNING id', (decision,venue_id,'pending')).fetchone()
-        if not row: raise HTTPException(404,'Pending venue not found')
-        info=conn.execute('SELECT owner_telegram_id,name FROM venues WHERE id=%s',(venue_id,)).fetchone()
-        conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)',(info['owner_telegram_id'],f'🏟 {info["name"]}: ariza {decision}.'))
-    return {'status':decision}
+        info = conn.execute('SELECT * FROM venues WHERE id=%s AND deleted_at IS NULL FOR UPDATE', (venue_id,)).fetchone()
+        if not info:
+            raise HTTPException(404, 'Maydon topilmadi.')
+        if decision in ('approved', 'rejected'):
+            if info['status'] != 'pending':
+                raise HTTPException(409, 'Ariza allaqachon koʻrib chiqilgan. Roʻyxatni yangilang.')
+            conn.execute('UPDATE venues SET status=%s,review_reason=%s WHERE id=%s', (decision, reason, venue_id))
+        else:
+            if info['suspended'] == (decision == 'suspend'):
+                raise HTTPException(409, 'Maydon holati allaqachon oʻzgargan. Roʻyxatni yangilang.')
+            conn.execute('UPDATE venues SET suspended=%s WHERE id=%s', (decision == 'suspend', venue_id))
+        audit(conn, actor, 'venue', venue_id, decision, reason)
+        labels = {'approved':'Tasdiqlandi', 'rejected':'Rad etildi', 'suspend':'Vaqtincha toʻxtatildi', 'resume':'Toʻxtatish olib tashlandi'}
+        message = f'🏟 {info["name"]}: {labels[decision]}.' + (f'\nSabab: {reason}' if reason else '')
+        conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)', (info['owner_telegram_id'], message))
+    return {'status': decision}
+
+@app.get('/admin/bookings')
+def admin_bookings(response: Response, status: Literal['all','pending','confirmed','rejected','cancelled'] = 'all',
+                   day: date | None = None, venue_id: int | None = None, booking_id: int | None = None,
+                   offset: int = Query(default=0, ge=0), _: int = Depends(admin)):
+    response.headers['Cache-Control'] = 'private, no-store'
+    clauses, params = [], []
+    for field, value in [('b.status', status if status != 'all' else None), ('b.venue_id', venue_id), ('b.id', booking_id)]:
+        if value is not None:
+            clauses.append(f'{field}=%s'); params.append(value)
+    if day:
+        start = datetime.combine(day, day_time(), tzinfo=UZBEKISTAN_TIME)
+        clauses.append('b.start_at >= %s AND b.start_at < %s'); params.extend([start, start + timedelta(days=1)])
+    where = ' AND '.join(clauses) or 'TRUE'
+    with db() as conn:
+        return conn.execute(f"SELECT b.*,v.name AS venue_name,v.owner_telegram_id FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE {where} ORDER BY b.start_at DESC,b.id DESC LIMIT 50 OFFSET %s", (*params, offset)).fetchall()
+
+@app.post('/admin/bookings/{booking_id}/cancel')
+def admin_cancel(booking_id: int, body: AdminReason, actor: int = Depends(admin)):
+    with db() as conn:
+        row = conn.execute("UPDATE bookings SET status='cancelled',cancellation_reason=%s WHERE id=%s AND status IN ('pending','confirmed') AND start_at > NOW() RETURNING *", (body.reason, booking_id)).fetchone()
+        if not row:
+            raise HTTPException(409, 'Faqat kelgusi faol bronni bekor qilish mumkin. Roʻyxatni yangilang.')
+        venue = conn.execute('SELECT name,owner_telegram_id FROM venues WHERE id=%s', (row['venue_id'],)).fetchone()
+        audit(conn, actor, 'booking', booking_id, 'cancelled', body.reason)
+        message = f'📅 Bron #{booking_id} — {venue["name"]} admin tomonidan bekor qilindi.\n{booking_time_label(row["start_at"])}\nSabab: {body.reason}'
+        for recipient in {row['user_telegram_id'], venue['owner_telegram_id']}:
+            conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)', (recipient, message))
+    return {'status': 'cancelled'}
 
 @app.post('/bookings', status_code=201)
 def book(booking: BookingIn, user: int = Depends(authenticate)):
@@ -302,7 +380,7 @@ def book(booking: BookingIn, user: int = Depends(authenticate)):
         contact = conn.execute('SELECT phone FROM telegram_contacts WHERE telegram_id=%s', (user,)).fetchone()
         if not contact:
             raise HTTPException(428, 'Bron qilishdan oldin Telegram orqali oʻz telefon raqamingizni ulashing.')
-        venue = conn.execute('SELECT id FROM venues WHERE deleted_at IS NULL AND id=%s AND status=%s FOR UPDATE', (booking.venue_id,'approved')).fetchone()
+        venue = conn.execute('SELECT id FROM venues WHERE deleted_at IS NULL AND NOT suspended AND id=%s AND status=%s FOR UPDATE', (booking.venue_id,'approved')).fetchone()
         if not venue: raise HTTPException(404,'Venue not found')
         conflict = conn.execute('''SELECT id FROM bookings WHERE venue_id=%s AND start_at=%s
           AND status IN ('pending','confirmed') LIMIT 1''', (booking.venue_id,start)).fetchone()
@@ -348,7 +426,7 @@ def cancel(booking_id: int, user: int = Depends(authenticate)):
 @app.get('/owner/venues')
 def owner_venues(user: int = Depends(authenticate)):
     with db() as conn:
-        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours,status, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE owner_telegram_id=%s AND deleted_at IS NULL ORDER BY id DESC',(user,)).fetchall()
+        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours,status,suspended,review_reason, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE owner_telegram_id=%s AND deleted_at IS NULL ORDER BY id DESC',(user,)).fetchall()
 
 @app.get('/admin/status')
 def admin_status(user: int = Depends(authenticate)):
