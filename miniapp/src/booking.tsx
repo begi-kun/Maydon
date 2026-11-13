@@ -7,11 +7,11 @@ const weekdays=['Yak','Du','Se','Chor','Pay','Ju','Sha'];
 const months=['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentabr','oktabr','noyabr','dekabr'];
 function dateLabel(value:string){const day=localDate(new Date(value));return `${Number(day.slice(8))} ${months[Number(day.slice(5,7))-1]}`;}
 type Slot={start_at:string;label:string;status:'available'|'booked'|'past'|'unavailable'|'closed'};
-function localDate(date:Date){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tashkent',year:'numeric',month:'2-digit',day:'2-digit'}).format(date)}
-export function BookingPicker({venueId,price,authenticated,botUsername,busy,revision,onBook}:{venueId:number;price:number;authenticated:boolean;botUsername:string;busy:boolean;revision:number;onBook:(time:string)=>void}){
+export function localDate(date:Date){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tashkent',year:'numeric',month:'2-digit',day:'2-digit'}).format(date)}
+export function BookingPicker({venueId,price,authenticated,botUsername,busy,revision,initialTime,onBook}:{venueId:number;price:number;authenticated:boolean;botUsername:string;busy:boolean;revision:number;initialTime?:string;onBook:(time:string)=>void}){
  const today=localDate(new Date());const maxDate=localDate(new Date(Date.now()+60*86400000));
  const [contactPhone,setContactPhone]=useState<string|null>(null);
- const requested=Number(new URLSearchParams(window.location.search).get('slot'))*1000;
+ const requested=initialTime?new Date(initialTime).getTime():Number(new URLSearchParams(window.location.search).get('slot'))*1000;
  const restore=useRef(requested>Date.now()&&requested<Date.now()+60*86400000?requested:0);
  const [day,setDay]=useState(restore.current?localDate(new Date(restore.current)):today);const [time,setTime]=useState('');const [slots,setSlots]=useState<Slot[]>([]);const [hours,setHours]=useState('');const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [retry,setRetry]=useState(0);
  useEffect(()=>{setTime('');setSlots([]);setLoading(true);setError('');const controller=new AbortController();

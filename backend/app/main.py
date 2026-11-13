@@ -274,11 +274,24 @@ def health():
     return JSONResponse({'status': 'ok'}, headers=headers)
 
 @app.get('/venues')
-def venues(sport: str | None = None):
+def venues(sport: str | None = None, available_at: datetime | None = None):
+    start = valid_start(available_at) if available_at is not None else None
+    query = """SELECT id,name,sport,address,latitude,longitude,price,phone,hours,
+        ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos
+        FROM venues WHERE deleted_at IS NULL AND NOT suspended AND status=%s"""
+    params = ['approved']
+    if sport:
+        query += ' AND sport=%s'
+        params.append(sport)
+    if start:
+        query += """ AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.venue_id=venues.id
+            AND b.start_at=%s AND b.status IN ('pending','confirmed'))
+            AND NOT EXISTS (SELECT 1 FROM owner_blocks ob WHERE ob.venue_id=venues.id AND ob.start_at=%s)"""
+        params.extend([start, start])
+    query += ' ORDER BY id DESC'
     with db() as conn:
-        if sport:
-            return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE deleted_at IS NULL AND NOT suspended AND status=%s AND sport=%s ORDER BY id DESC', ('approved',sport)).fetchall()
-        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE deleted_at IS NULL AND NOT suspended AND status=%s ORDER BY id DESC', ('approved',)).fetchall()
+        rows = conn.execute(query, params).fetchall()
+    return [row for row in rows if not start or is_open(row['hours'], start)]
 
 @app.get('/venues/{venue_id}/availability')
 def availability(venue_id: int, day: date):
