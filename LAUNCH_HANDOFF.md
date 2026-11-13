@@ -1,5 +1,7 @@
 # MAYDON — deployment handoff (November 5, 2026)
 
+> Historical handoff. See [README.md](README.md), [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md) and [UPDATE_PLAN.md](UPDATE_PLAN.md) for current deployment status. Statements below describe November 5.
+
 ## What is implemented
 - React Telegram Mini App: venue discovery, sport filters, map pins, booking requests, booking history/cancellation, owner venue submission and booking decisions, admin venue approval.
 - FastAPI: Telegram signed initData validation, PostgreSQL persistence, venue and booking permissions, transaction-serialized slot creation plus a partial unique index.

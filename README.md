@@ -118,7 +118,7 @@ Backend checks (use an empty disposable PostgreSQL database): install
 `TEST_DATABASE_URL=postgresql://... python -m unittest discover -s backend/tests -v`.
 Frontend check: run `npm ci && npm run build` in `miniapp/`.
 
-**Before public launch:** Add owner/admin UI, notification delivery, rate limits, monitoring, opening-hour validation, privacy policy, and run end-to-end tests. A passing Python syntax check is not a production acceptance test.
+**Before wider public promotion:** Complete rate limits, monitoring, backup restore checks, privacy/support information and real-account end-to-end tests. Owner/admin UI, notifications and opening-hour validation are implemented. See [the update plan](UPDATE_PLAN.md) and [release checklist](PRODUCTION_CHECKLIST.md).
 # Maydon
 # Maydon
 # Maydon
@@ -195,3 +195,37 @@ an owner/timestamp audit history. It does not collect money, record deposit
 amounts, or issue refunds. Cancelled bookings retain their payment state.
 Deploy the backend schema and updated bot reminder worker before enabling the new
 frontend; manual bookings have a nullable Telegram customer ID.
+
+## Admin operations release
+
+The admin panel now opens on **Eʼtibor**: full counts of pending venue reviews,
+future pending bookings, and notification delivery problems, with record links.
+It previews the oldest 20 venue applications and nearest 20 pending bookings.
+**Xabarlar** lists failed attempts and unsent messages older than five minutes;
+expired/cancelled booking reminders are excluded. The bot retries automatically.
+Delivery means Telegram accepted a message, not that its recipient read it.
+
+**Egalar va mijozlar** searches names, usernames, phone numbers and Telegram IDs,
+with owner/customer/manual filters and links to venues and bookings. Telegram
+names are saved from verified `/auth/me` sessions going forward; existing users
+may have no name until they reopen the Mini App. Phone values may come from a
+shared contact, a booking snapshot or an owner's venue listing. Manual customers
+remain separate per booking and are never merged by name or phone.
+
+Booking details combine recorded creation/status events, owner payment history,
+admin cancellation reasons and linked notification delivery status. New status
+events are committed in the same transaction as the booking change, including
+Telegram bot owner decisions. Legacy bookings explicitly indicate incomplete
+history; old unlinked notifications are not inferred from message text. Timelines
+and operational lists use 50-record pages; notification history shows the latest
+50 linked messages. Payment records remain status-only, not money processing.
+
+**Faoliyat** exposes the existing admin audit trail with entity, actor, action,
+and Uzbekistan-date filters. All operational endpoints require the configured
+admin and return private, non-cacheable responses. This release does not add
+additional admin roles, support tickets or automatic infrastructure monitoring.
+
+Deploy order: backend (additive schema), bot, frontend. Existing bookings and
+photos are retained. Application rollback can retain the added tables/columns;
+do not remove them while either updated service is running. The live verification
+script now checks the admin endpoints and frontend features as well as owners.

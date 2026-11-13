@@ -1,29 +1,42 @@
-# MAYDON launch checklist — November 6 target
+# MAYDON production checklist
 
-## Deploy order
-1. Create a managed PostgreSQL database with backups. Do not use ephemeral SQLite for live bookings.
-2. Deploy `backend/` as a Render **Web Service**, Docker runtime, health check `/health`. Set `DATABASE_URL`, `BOT_TOKEN`, `ADMIN_TELEGRAM_ID`, `CORS_ORIGINS=https://maydon-bot.vercel.app` as service secrets. Never expose BOT_TOKEN in `VITE_` variables.
-3. In Vercel, set Root Directory `miniapp`, Framework `Vite`, Build `npm run build`, Output `dist`, and `VITE_API_URL=https://<backend-domain>`; optionally `VITE_YANDEX_MAPS_KEY` with domain restrictions. Redeploy after changing environment variables.
-4. Deploy `bot/` as an **always-on background worker**, Docker runtime, with `BOT_TOKEN` and `MINI_APP_URL=https://maydon-bot.vercel.app`. Only run **one** polling worker for the bot token. Alternatively use a webhook implementation; this starter uses polling.
-5. In BotFather, configure menu button URL `https://maydon-bot.vercel.app`.
-6. From Telegram, open Mini App and verify live venue list, request booking, owner confirmation, user booking history, cancellation, and admin venue approval.
-7. Have real venue owners register their venues. Admin approval required before listing; do not publish invented listings.
+Updated November 12, 2026. Production runs on Railway; see README.md for deployment commands.
 
-## Current limitations — do not claim full production readiness until addressed
-- Admin and owner APIs exist, but **there is no admin/owner dashboard UI**. They require a secure authenticated API client or additional UI work.
-- There are no automatic owner/user Telegram booking notifications yet. Owners must manually check pending bookings via authenticated API.
-- Booking slots are **fixed one-hour slots starting on the hour**; opening-hours validation and more flexible durations are not implemented.
-- Photos, favorites, search, payments, venue verification, and polished Figma fidelity are not implemented.
-- Add monitoring, rate limiting, abuse prevention, database migrations, backups/restore tests, privacy policy, and incident response before public marketing.
-- The React application only displays approved venues. There are no fabricated production venue listings.
-- Set the Yandex Maps API key and check allowed domains and quota.
-- Telegram WebApp initData expires after one hour in this API; users may need to reopen the Mini App to refresh it.
+## Shipped
 
-## Smoke tests
-- `GET /health` should return `{ "status": "ok" }`.
-- `GET /venues` should return `[]` until approved venues exist.
-- `POST /bookings` without `X-Telegram-Init-Data` must return 401.
-- `GET /admin/venues` without auth must return 401.
-- Try two simultaneous bookings for the same venue and start hour; one should return 409.
-- Verify CORS only allows the deployed Mini App origin.
-- Check Vercel deployment logs and Render backend logs for errors.
+- [x] Customer bookings, verified Telegram contact, cancellation and owner decisions.
+- [x] Owner daily/weekly schedule, manual bookings, blocked hours and opening-hour enforcement.
+- [x] Searchable history, payment-status tracking, overview and analytics.
+- [x] Venue editing/photos and admin moderation, suspension and booking management.
+- [x] Telegram notifications and reminders; manual bookings excluded from customer reminders.
+- [x] Owner frontend and bot deployed; backend deployed from the merged owner commit.
+
+## Every release
+
+- [ ] Run backend tests against fresh disposable PostgreSQL, never production.
+- [ ] Run `npm ci` and `npm run build` in `miniapp/`.
+- [ ] Review schema compatibility; deploy backend before dependent bot/frontend changes.
+- [ ] Verify successful Railway deployments and startup logs. Keep exactly one bot polling worker.
+- [ ] Run `python3 scripts/check_live.py`. This checks public health/assets and auth boundaries, not a signed Telegram journey.
+- [ ] Test changed user flows in Telegram, mobile layout and account isolation.
+
+## Remaining before wider public promotion
+
+- [ ] Shared rate limits and request-size protection.
+- [ ] Backups verified by an isolated restore.
+- [ ] Versioned migrations with upgrade tests.
+- [ ] External alerts and notification-backlog monitoring.
+- [ ] Accurate privacy/support information, retention and deletion process.
+- [ ] Real-account end-to-end checks for booking, confirmation, cancellation and reminders.
+- [ ] Verify map provider domain restrictions and quota.
+- [ ] Require hosted CI before merge; adding a workflow does not enforce this automatically.
+
+## Known boundaries
+
+- Bookings use fixed one-hour slots in Uzbekistan time.
+- Payment states do not collect money or record deposit amounts.
+- At-least-once notifications may duplicate after a worker crash.
+- Telegram sign-in expires after one hour and may require reopening the app.
+- Startup applies additive schema changes; versioned migrations are planned.
+
+See UPDATE_PLAN.md for priorities and acceptance criteria.
