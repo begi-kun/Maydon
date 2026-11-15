@@ -1,0 +1,43 @@
+{
+  "checkedAt": "2026-11-15T17:08:50.778Z",
+  "web": "https://maydon-web-production-3612.up.railway.app",
+  "environment": "Public production, real API/photos; no authenticated or mutating calls",
+  "checks": [
+    {
+      "width": 360,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "width": 430,
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "overflow": false
+    },
+    {
+      "width": 1280,
+      "overflow": false
+    },
+    "real production photo loaded",
+    "production availability, summary and Telegram venue/slot link"
+  ],
+  "accessibility": [
+    {
+      "name": "home-desktop",
+      "violations": []
+    },
+    {
+      "name": "home",
+      "violations": []
+    },
+    {
+      "name": "detail",
+      "violations": []
+    }
+  ]
+}

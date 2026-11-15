@@ -1,0 +1,8 @@
+{
+  "source_commit": "2ae3d59",
+  "database": "Disposable local PostgreSQL (not production)",
+  "command": "TEST_DATABASE_URL=<disposable database> python -m unittest discover -s backend/tests -v",
+  "tests": 50,
+  "result": "OK",
+  "duration_seconds": 7.93
+}

@@ -1,0 +1,14 @@
+{
+  "checkedAt": "2026-11-15T16:31:49.223Z",
+  "environment": "Real local FastAPI/PostgreSQL and photo endpoint; signed test identity and simulated Telegram contact bridge; no production mutations",
+  "checks": [
+    "real photo loaded",
+    "exact-time search",
+    "selected time restored",
+    "contact refresh",
+    "pending booking submitted",
+    "owner confirmed booking",
+    "confirmed status text",
+    "occupied slot excluded from search"
+  ]
+}

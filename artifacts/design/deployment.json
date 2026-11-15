@@ -1,0 +1,17 @@
+{
+  "service": "Maydon-web",
+  "deployment_id": "550ce01b-e595-4c99-a8f3-6830a94fb947",
+  "status": "SUCCESS",
+  "web": "https://maydon-web-production-3612.up.railway.app",
+  "previous_deployment": "ca577424-c8cf-4a60-bfbb-22fb79439488",
+  "intermediate_deployment": "22ef4c8e-9d34-4ad5-ab5e-fdb65ce80509",
+  "post_deployment_checks": {
+    "health_and_auth_boundaries": "PASS",
+    "design_assets": "PASS",
+    "public_browser_and_photos": "PASS",
+    "wcag_automated_home_and_detail": "PASS",
+    "wcag_automated_desktop_home": "PASS"
+  },
+  "physical_telegram_device_check": "NOT PERFORMED: no device access or user confirmation",
+  "note": "Only isolated frontend design source deployed. Backend/bot/product changes in shared workspace preserved and not deployed by this design release. Desktop active navigation uses dark green text on pale green; desktop audit added."
+}

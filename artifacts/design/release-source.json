@@ -1,0 +1,19 @@
+{
+  "base_commit": "2ae3d593cb2edf4cd9cb2a72f0e91bb774421afc",
+  "release_source": "/private/tmp/maydon-design-release",
+  "files": {
+    "miniapp/package.json": "4f76c5febea58dd7acafc523c6b851530e5f5d4255fdfd99a7a9d7fd669b078c",
+    "miniapp/package-lock.json": "d5a5d937f6e7720e109fa178d28c25a154c634851afd9bd911e1d9892a0202a4",
+    "miniapp/src/main.tsx": "ee0593f8101d06bcd0e2388ac9b64c52b8c87c3e5c62a2d7c22dbe1e4a9085e2",
+    "miniapp/src/booking.tsx": "0f6ae7b8a1232094831a7651bd13917ed1bb6359aa016a16cc11bef4d9943836",
+    "miniapp/src/owner-panel.tsx": "ae45fd49d8a791c9b45de10befd4c84afbc759c070b8f01452f0e496b84c5f86",
+    "miniapp/src/contact.tsx": "4328515f646f9f64065a2aab662b6e88bfb83e6d5d1b0783314603d84d7c6a93",
+    "miniapp/src/owner.tsx": "9293fad7c12d44d9f0b94943174d6bfc2a729c881a5724f111954fb641be1291",
+    "miniapp/src/style.css": "064904b9d82ac4d0f658cff5925702973c893d965dc4b5afbbda88ca126bebff",
+    "miniapp/tests/design-check.mjs": "dec454197fb0fe8bc556e1baa8f0fb11d639401d18d2fbeecab22a715aaeabe6",
+    "miniapp/tests/discovery.test.mjs": "791607b36ed881acd8df8aea1923f1dafda12fb809ffceda5706711895c719e1",
+    "miniapp/tests/live-design-check.mjs": "c9032ed60fdfb5a4ee363f067ce2419aaab579ad5cc1428ec7954ba295d87757",
+    ".github/workflows/validate.yml": "14af479748500b79f802d429d42edd9d4127412132bb61647431bb42ab6d36f1",
+    "scripts/check_live.py": "18e64ddb17752af7a088828e3e900f161bf967cf74748cf4ee20f0028ef2408e"
+  }
+}

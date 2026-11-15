@@ -1,0 +1,185 @@
+[
+  {
+    "path": "",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": [
+          {
+            "target": [
+              ".count"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.42 (foreground color: #6e7b73, background color: #ffffff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<span class=\"count\">1 ta maydon</span>"
+          },
+          {
+            "target": [
+              ".venue-footer > div > span"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.42 (foreground color: #6e7b73, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<span>soʻm / soat</span>"
+          },
+          {
+            "target": [
+              "div:nth-child(2) > .eyebrow"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.41 (foreground color: #708273, background color: #e6eddd, font size: 6.0pt (8px), font weight: bold). Expected contrast ratio of 4.5:1",
+            "html": "<span class=\"eyebrow\">MAYDON EGALARI UCHUN</span>"
+          },
+          {
+            "target": [
+              ".owner-banner > div:nth-child(2) > p"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.76 (foreground color: #6c7b65, background color: #e6eddd, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<p>Maydoningizni joylang, bronlarni bir joyda boshqaring.</p>"
+          },
+          {
+            "target": [
+              "footer > p"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.11 (foreground color: #6e7b73, background color: #f6f7f2, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<p>Yaxshi oʻyin — yaxshi maydondan.</p>"
+          },
+          {
+            "target": [
+              "small"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.11 (foreground color: #6e7b73, background color: #f6f7f2, font size: 6.8pt (9px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<small>Namangan, Oʻzbekiston</small>"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "path": "?venue=1&slot=1794927600",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "nodes": [
+          {
+            "target": [
+              ".detail-heading > .eyebrow"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.8 (foreground color: #708273, background color: #f6f7f2, font size: 6.0pt (8px), font weight: bold). Expected contrast ratio of 4.5:1",
+            "html": "<span class=\"eyebrow\">Futbol</span>"
+          },
+          {
+            "target": [
+              ".detail-heading > p"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.11 (foreground color: #6e7b73, background color: #f6f7f2, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<p>"
+          },
+          {
+            "target": [
+              ".detail-facts > div > span"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.42 (foreground color: #6e7b73, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<span>Ish vaqti<strong>08:00–23:00</strong></span>"
+          },
+          {
+            "target": [
+              "a[target=\"_blank\"] > span"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.42 (foreground color: #6e7b73, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<span>Manzilga borish<strong>Yoʻnalishni ochish ↗</strong></span>"
+          },
+          {
+            "target": [
+              "aside > .eyebrow"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.09 (foreground color: #708273, background color: #ffffff, font size: 6.0pt (8px), font weight: bold). Expected contrast ratio of 4.5:1",
+            "html": "<span class=\"eyebrow\">KEYINGI OʻYININGIZ</span>"
+          },
+          {
+            "target": [
+              "h2 > small"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.42 (foreground color: #6e7b73, background color: #ffffff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<small>soʻm / soat</small>"
+          },
+          {
+            "target": [
+              ".timezone-tag"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.42 (foreground color: #6e7b73, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<span class=\"timezone-tag\">Namangan · UTC+5</span>"
+          },
+          {
+            "target": [
+              ".slot-hours"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.42 (foreground color: #6e7b73, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<p class=\"slot-hours\">"
+          },
+          {
+            "target": [
+              ".field-help"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.42 (foreground color: #6e7b73, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<p class=\"field-help\">Band vaqtlarni tanlab boʻlmaydi. Yopiq soatlar avtomatik cheklangan. Bron egasi tasdiqlagach kuchga kiradi.</p>"
+          },
+          {
+            "target": [
+              ".booking-summary > div > span"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.94 (foreground color: #6e7b73, background color: #eef4e4, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<span>1 soat · 20:00–21:00</span>"
+          },
+          {
+            "target": [
+              ".booking-login > p"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.42 (foreground color: #6e7b73, background color: #ffffff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<p>Telegram hisobingiz bilan davom eting. Botdagi tugma sizni shu maydonga qaytaradi.</p>"
+          },
+          {
+            "target": [
+              "footer > p"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.11 (foreground color: #6e7b73, background color: #f6f7f2, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<p>Yaxshi oʻyin — yaxshi maydondan.</p>"
+          },
+          {
+            "target": [
+              "footer > small"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 4.11 (foreground color: #6e7b73, background color: #f6f7f2, font size: 6.8pt (9px), font weight: normal). Expected contrast ratio of 4.5:1",
+            "html": "<small>Namangan, Oʻzbekiston</small>"
+          },
+          {
+            "target": [
+              "button:nth-child(2) > span"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.74 (foreground color: #7b877d, background color: #ffffff, font size: 6.0pt (8px), font weight: bold). Expected contrast ratio of 4.5:1",
+            "html": "<span>Qidiruv</span>"
+          },
+          {
+            "target": [
+              "button:nth-child(3) > span"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.74 (foreground color: #7b877d, background color: #ffffff, font size: 6.0pt (8px), font weight: bold). Expected contrast ratio of 4.5:1",
+            "html": "<span>Xarita</span>"
+          },
+          {
+            "target": [
+              "button:nth-child(4) > span"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.74 (foreground color: #7b877d, background color: #ffffff, font size: 6.0pt (8px), font weight: bold). Expected contrast ratio of 4.5:1",
+            "html": "<span>Bronlar</span>"
+          },
+          {
+            "target": [
+              "button:nth-child(5) > span"
+            ],
+            "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.74 (foreground color: #7b877d, background color: #ffffff, font size: 6.0pt (8px), font weight: bold). Expected contrast ratio of 4.5:1",
+            "html": "<span>Profil</span>"
+          }
+        ]
+      }
+    ]
+  }
+]

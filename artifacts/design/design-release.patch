@@ -1,0 +1,539 @@
+--- a/miniapp/package.json
++++ b/miniapp/package.json
+@@ -1 +1 @@
+-{"name":"maydon-miniapp","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"vite --host 0.0.0.0","build":"tsc -b && vite build","preview":"vite preview"},"dependencies":{"@vitejs/plugin-react":"^4.3.0","vite":"^5.4.0","typescript":"^5.6.0","react":"^18.3.0","react-dom":"^18.3.0","lucide-react":"^0.468.0"},"devDependencies":{"@types/react":"^18.3.0","@types/react-dom":"^18.3.0"}}
++{"name":"maydon-miniapp","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"vite --host 0.0.0.0","test":"node --test tests/*.test.mjs","build":"tsc -b && vite build","preview":"vite preview","test:design":"node tests/design-check.mjs","test:product":"node tests/product-check.mjs","test:design:live":"node tests/live-design-check.mjs"},"dependencies":{"@vitejs/plugin-react":"^4.3.0","lucide-react":"^0.468.0","react":"^18.3.0","react-dom":"^18.3.0","typescript":"^5.6.0","vite":"^5.4.0"},"devDependencies":{"@types/react":"^18.3.0","@types/react-dom":"^18.3.0","axe-core":"^4.14.0","playwright":"^1.65.1"}}
+--- a/miniapp/package-lock.json
++++ b/miniapp/package-lock.json
+@@ -17,7 +17,9 @@
+       },
+       "devDependencies": {
+         "@types/react": "^18.3.0",
+-        "@types/react-dom": "^18.3.0"
++        "@types/react-dom": "^18.3.0",
++        "axe-core": "^4.14.0",
++        "playwright": "^1.65.1"
+       }
+     },
+     "node_modules/@babel/code-frame": {
+@@ -1133,6 +1135,16 @@
+       },
+       "peerDependencies": {
+         "vite": "^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0"
++      }
++    },
++    "node_modules/axe-core": {
++      "version": "4.14.0",
++      "resolved": "https://registry.npmjs.org/axe-core/-/axe-core-4.14.0.tgz",
++      "integrity": "sha512-9WTZxEjsZ7b13TH8JPmbV2z8CHbl80/2hm3XPEG4JgNdQLK81IBRXmSxHfMAOkSqQeRxT/0dwNDz2GOm3zzpcQ==",
++      "dev": true,
++      "license": "MPL-2.0",
++      "engines": {
++        "node": ">=4"
+       }
+     },
+     "node_modules/baseline-browser-mapping": {
+@@ -1404,6 +1416,35 @@
+       "resolved": "https://registry.npmjs.org/picocolors/-/picocolors-1.1.1.tgz",
+       "integrity": "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==",
+       "license": "ISC"
++    },
++    "node_modules/playwright": {
++      "version": "1.65.1",
++      "resolved": "https://registry.npmjs.org/playwright/-/playwright-1.65.1.tgz",
++      "integrity": "sha512-vJ1FuoOrNwOKHUIVEvSt3jT1L+wjjDpwhwIstKtfvTh8XIG4FG4bIFuvNdMxi81LGfAhUgUZleVFaOLY4RIUUw==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "dependencies": {
++        "playwright-core": "1.65.1"
++      },
++      "bin": {
++        "playwright": "cli.js"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/playwright-core": {
++      "version": "1.65.1",
++      "resolved": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.65.1.tgz",
++      "integrity": "sha512-hqPpz7blSMPxWVdoeE1yiBSzXsKiVOd2k+kjCvmUywD2GPO2Dd9HfcWnq9NN0GHbNZDFgZ9JfBFr+X5/BLo0qw==",
++      "dev": true,
++      "license": "Apache-2.0",
++      "bin": {
++        "playwright-core": "cli.js"
++      },
++      "engines": {
++        "node": ">=20"
++      }
+     },
+     "node_modules/postcss": {
+       "version": "8.5.32",
+--- a/miniapp/src/main.tsx
++++ b/miniapp/src/main.tsx
+@@ -1,6 +1,6 @@
+ import {VenueAmenities} from './owner';
+ import {readDiscovery, discoveryLink, validDiscoveryTime} from './discovery';
+-import React, {useEffect, useMemo, useState} from 'react';
++import React, {useEffect, useMemo, useRef, useState} from 'react';
+ import {createRoot} from 'react-dom/client';
+ import {House, Search, MapPin, UserRound, CalendarDays, ArrowUpRight, ArrowLeft, ArrowRight, Clock3, Phone, ShieldCheck, Plus, RefreshCw, X, Check, Compass, Goal, SlidersHorizontal, Send} from 'lucide-react';
+ import './style.css';
+@@ -21,6 +21,7 @@
+ const initData=()=>window.Telegram?.WebApp?.initData||'';
+ function Status({value}:{value:string}){return <span className={`status status-${value}`}><i/>{statusName[value]||value}</span>}
+ function Empty({title,children,action}:{title:string;children:React.ReactNode;action?:React.ReactNode}){return <div className="empty"><div className="empty-icon"><Goal size={30}/></div><h3>{title}</h3><p>{children}</p>{action}</div>}
++function VenueArt({sport}:{sport:string}){return sport==='football'?<PitchArt/>:<div className="sport-placeholder" aria-hidden="true"><img src={`/icons/${sport==='table_tennis'?'table-tennis':'billiards'}.svg`} alt=""/></div>}
+ function PitchArt(){return <div className="pitch-art" aria-hidden="true"><div className="pitch-lines"><i className="pitch-center"/><i className="pitch-box left"/><i className="pitch-box right"/></div></div>}
+ function MapView({venues,onSelect}:{venues:Venue[];onSelect:(venue:Venue)=>void}){
+  const [error,setError]=useState('');
+@@ -32,11 +33,13 @@
+  return <div className="mapwrap">{error?<Empty title="Xarita yuklanmadi">{error}</Empty>:<div id="maydon-map" className="map"/>}</div>
+ }
+ function App(){
++ const mainRef=useRef<HTMLElement>(null);const navRef=useRef<HTMLElement>(null);
++ useEffect(()=>{const nav=navRef.current;if(!nav)return;const resize=new ResizeObserver(()=>document.documentElement.style.setProperty('--nav-height',`${nav.getBoundingClientRect().height}px`));resize.observe(nav);return()=>resize.disconnect()},[]);
+  const [tab,setTab]=useState<Tab>(new URLSearchParams(window.location.search).has('owner')?'owner':'home');
+  const [initialDiscovery]=useState(()=>readDiscovery(window.location.search));
+  const [sport,setSport]=useState(initialDiscovery.sport);const [query,setQuery]=useState(initialDiscovery.query);const [venues,setVenues]=useState<Venue[]>([]);
+  const [selected,setSelected]=useState<Venue|null>(null);const [availabilityRevision,setAvailabilityRevision]=useState(0);const [message,setMessage]=useState('');
+- const [loading,setLoading]=useState(true);const [bookingBusy,setBookingBusy]=useState(false);
++ const [venueError,setVenueError]=useState('');const [loading,setLoading]=useState(true);const [bookingBusy,setBookingBusy]=useState(false);
+  const [isAdmin,setIsAdmin]=useState(false);const [verifiedUser,setVerifiedUser]=useState<{id:number;first_name:string}|null>(null);
+  const [authLoading,setAuthLoading]=useState(!!initData());const [botUsername,setBotUsername]=useState('');const [myBookings,setMyBookings]=useState<Booking[]>([]);
+  useEffect(()=>{window.Telegram?.WebApp?.ready();window.Telegram?.WebApp?.expand();loadVenues();},[]);
+@@ -48,23 +51,26 @@
+  const [filterDay,setFilterDay]=useState(initialDiscovery.day||today);const [filterTime,setFilterTime]=useState(initialDiscovery.time);
+  const [nearby,setNearby]=useState(false);const [position,setPosition]=useState<{latitude:number;longitude:number}|null>(null);const [locating,setLocating]=useState(false);const [locationError,setLocationError]=useState('');
+  useEffect(()=>{let active=true;if(navigator.permissions&&navigator.geolocation)navigator.permissions.query({name:'geolocation'}).then(permission=>{if(active&&permission.state==='granted')navigator.geolocation.getCurrentPosition(p=>{if(active)setPosition({latitude:p.coords.latitude,longitude:p.coords.longitude})},()=>{},{timeout:12000,maximumAge:60000})}).catch(()=>{});return()=>{active=false}},[]);
++ const [availabilityBusy,setAvailabilityBusy]=useState(false);
+  const [availableIds,setAvailableIds]=useState<number[]>([]);const [availabilityKey,setAvailabilityKey]=useState('');const [searchError,setSearchError]=useState('');const [searchRetry,setSearchRetry]=useState(0);
+  useEffect(()=>{if(filterDay<today){setFilterDay(today);setFilterTime('')}else if(filterTime&&filterTimeDisabled(filterDay,filterTime))setFilterTime('')},[filterNow,filterDay,filterTime,today]);
+  const searchTime=filterTime&&filterDay>=today&&!filterTimeDisabled(filterDay,filterTime)?`${filterDay}T${filterTime}:00+05:00`:'';
+- useEffect(()=>{if(!searchTime){setSearchError('');return;}const controller=new AbortController();setSearchError('');setAvailabilityKey('');
+-  fetch(`${API}/venues?available_at=${encodeURIComponent(searchTime)}`,{signal:controller.signal}).then(async r=>{if(!r.ok)throw Error(r.status===422?'Kelajakdagi vaqtni tanlang (5 daqiqadan 60 kungacha).':'Vaqtlarni tekshirib boʻlmadi. Qayta urinib koʻring.');return r.json()}).then((list:Venue[])=>{if(!controller.signal.aborted){setAvailableIds(list.map(v=>v.id));setAvailabilityKey(searchTime)}}).catch(e=>{if(!controller.signal.aborted)setSearchError(e.message)});
++ useEffect(()=>{if(!searchTime){setSearchError('');setAvailabilityBusy(false);return;}const controller=new AbortController();setSearchError('');setAvailabilityBusy(true);
++  fetch(`${API}/venues?available_at=${encodeURIComponent(searchTime)}`,{signal:controller.signal}).then(async r=>{if(!r.ok)throw Error(r.status===422?'Kelajakdagi vaqtni tanlang (5 daqiqadan 60 kungacha).':'Vaqtlarni tekshirib boʻlmadi. Qayta urinib koʻring.');return r.json()}).then((list:Venue[])=>{if(!controller.signal.aborted){setAvailableIds(list.map(v=>v.id));setAvailabilityKey(searchTime)}}).catch(e=>{if(!controller.signal.aborted)setSearchError(e.message)}).finally(()=>{if(!controller.signal.aborted)setAvailabilityBusy(false)});
+   return()=>controller.abort();
+  },[searchTime,searchRetry,availabilityRevision,venues,filterNow]);
+- const searchLoading=!!searchTime&&availabilityKey!==searchTime&&!searchError;
++ const searchLoading=!!searchTime&&(availabilityBusy||availabilityKey!==searchTime)&&!searchError;
+  function distance(v:Venue){if(!position)return 0;const rad=Math.PI/180;const a=Math.sin((v.latitude-position.latitude)*rad/2)**2+Math.cos(position.latitude*rad)*Math.cos(v.latitude*rad)*Math.sin((v.longitude-position.longitude)*rad/2)**2;return 6371*2*Math.asin(Math.sqrt(Math.min(1,a)))}
+  function distanceLabel(v:Venue){const km=distance(v);return km<1?`${Math.max(10,Math.round(km*1000/10)*10)} m`:`${km.toLocaleString('uz-UZ',{maximumFractionDigits:1,minimumFractionDigits:1})} km`}
+  function toggleNearby(){if(nearby){setNearby(false);return;}if(position){setNearby(true);return;}if(!navigator.geolocation){setLocationError('Qurilmangiz joylashuvni aniqlashni qoʻllamaydi.');return;}setLocating(true);setLocationError('');navigator.geolocation.getCurrentPosition(p=>{setPosition({latitude:p.coords.latitude,longitude:p.coords.longitude});setNearby(true);setLocating(false)},e=>{setLocating(false);setLocationError(e.code===1?'Yaqin maydonlarni koʻrish uchun joylashuvga ruxsat bering.':'Joylashuv aniqlanmadi. Qayta urinib koʻring.')},{timeout:12000,maximumAge:60000,enableHighAccuracy:true})}
+  function clearFilters(){setQuery('');setSport('all');setFilterTime('');setFilterDay(today);setNearby(false);setLocationError('')}
+  const hasFilters=!!query||sport!=='all'||!!filterTime||nearby;
+  const shown=useMemo(()=>venues.filter(v=>(sport==='all'||v.sport===sport)&&`${v.name} ${v.address}`.toLocaleLowerCase().includes(query.toLocaleLowerCase().trim())&&(!searchTime||availabilityKey===searchTime&&availableIds.includes(v.id))).sort((a,b)=>nearby&&position?distance(a)-distance(b):0),[venues,sport,query,searchTime,availabilityKey,availableIds,nearby,position]);
+- async function loadVenues(){setLoading(true);try{const r=await fetch(`${API}/venues`);if(!r.ok)throw Error();const list=await r.json();setVenues(list);const venueId=Number(new URLSearchParams(window.location.search).get('venue'));if(venueId){const match=list.find((v:Venue)=>v.id===venueId);if(match)setSelected(match)}}catch{setMessage('Maydonlarni yuklab boʻlmadi. Qayta urinib koʻring.')}finally{setLoading(false)}}
++ function openVenue(venue:Venue){setSelected(venue);window.scrollTo({top:0})}
++ async function loadVenues(){setLoading(true);setVenueError('');try{const r=await fetch(`${API}/venues`);if(!r.ok)throw Error();const list=await r.json();setVenues(list);const venueId=Number(new URLSearchParams(window.location.search).get('venue'));if(venueId){const match=list.find((v:Venue)=>v.id===venueId);if(match)setSelected(match)}}catch{setVenueError('Maydonlarni yuklab boʻlmadi. Qayta urinib koʻring.')}finally{setLoading(false)}}
+  async function loadBookings(){if(!initData())return;try{const r=await fetch(`${API}/bookings/me`,{headers:authHeaders()});if(!r.ok)throw Error();setMyBookings(await r.json())}catch{setMessage('Bronlarni yuklab boʻlmadi.')}}
+ 
++ useEffect(()=>{mainRef.current?.focus({preventScroll:true})},[tab,selected?.id]);
+  function navigate(next:Tab){setTab(next);setSelected(null);if(next==='bookings')loadBookings();window.scrollTo({top:0,behavior:'smooth'})}
+  async function decide(path:string,refresh:()=>void){try{const r=await fetch(`${API}${path}`,{method:'POST',headers:authHeaders()});if(!r.ok)throw Error();setAvailabilityRevision(n=>n+1);refresh()}catch{setMessage('Amal bajarilmadi. Qayta urinib koʻring.')}}
+  async function book(time:string){
+@@ -76,36 +82,37 @@
+   }catch(e){setMessage(e instanceof Error?e.message:'Bron yuborilmadi.')}finally{setBookingBusy(false)}
+  }
+  const loginPanel=<div className="login-card"><div className="login-symbol"><Send size={30}/></div><span className="eyebrow">SIZNING HISOBINGIZ</span><h2>Oʻyinga qoʻshiling.</h2><p>Oʻz Telegram hisobingiz orqali kiring. Maydonlarni bron qiling yoki oʻz maydoningizni joylang.</p>{authLoading?<p>Hisob tekshirilmoqda…</p>:botUsername?<a className="primary login-link" href={`https://t.me/${botUsername}?start=owner`}>Telegram orqali kirish <ArrowUpRight size={18}/></a>:<p>Ilovani Telegram botining menyusidan oching.</p>}<small>Botni oching → Start → MAYDONni ochish</small></div>;
+- function venueCard(v:Venue){return <button className="venue-card" key={v.id} onClick={()=>{setSelected(v);window.scrollTo({top:0})}}><div className="venue-image">{v.photos?.length?<PhotoGallery ids={v.photos.slice(0,1)}/>:<PitchArt/>}<span className="sport-badge">{sportName(v.sport)}</span><span className="card-arrow"><ArrowUpRight size={20}/></span></div><div className="venue-content"><h3>{v.name}</h3>{searchTime&&!searchLoading&&!searchError&&<p className="venue-slot"><Clock3 size={14}/>{filterTime} · 1 soat uchun boʻsh</p>}<p className="venue-distance"><Compass size={14}/><span>{position?<>Sizdan ≈ <strong>{distanceLabel(v)}</strong><small>Toʻgʻri chiziq boʻylab</small></>:locating?'Masofa aniqlanmoqda…':'Masofa uchun “Menga yaqin”ni bosing'}</span></p><div className="venue-footer"><div><strong>{price(v.price)}</strong> <span>soʻm / soat</span></div><span className="card-book">Bron qilish <ArrowRight size={14}/></span></div></div></button>}
++ function venueCard(v:Venue){return <button className="venue-card" disabled={!!searchTime&&searchLoading} key={v.id} onClick={()=>openVenue(v)}><div className="venue-image">{v.photos?.length?<PhotoGallery ids={v.photos.slice(0,1)}/>:<VenueArt sport={v.sport}/>}<span className="sport-badge">{sportName(v.sport)}</span><span className="card-arrow"><ArrowUpRight size={20}/></span></div><div className="venue-content"><h3>{v.name}</h3><p className="venue-address"><MapPin size={14}/><span>{v.address.startsWith('Xaritadagi joy:')?'Joylashuv xaritada belgilangan':v.address}</span></p>{searchTime&&!searchError&&<p className="venue-slot"><Clock3 size={14}/>{filterTime} · {searchLoading?'Tekshirilmoqda…':'1 soat uchun boʻsh'}</p>}<p className="venue-distance"><Compass size={14}/><span>{position?<>Sizdan ≈ <strong>{distanceLabel(v)}</strong><small>Toʻgʻri chiziq boʻylab</small></>:locating?'Masofa aniqlanmoqda…':'Masofani “Menga yaqin” orqali biling'}</span></p><div className="venue-footer"><div><strong>{price(v.price)}</strong> <span>soʻm / soat</span></div><span className="card-book">Davom etish <ArrowRight size={14}/></span></div></div></button>}
+  const tomorrow=localDate(new Date(Date.parse(`${today}T12:00:00+05:00`)+86400000));
+  const quickTimes=[{day:today,time:'18:00',label:'Bugun 18:00'},{day:today,time:'20:00',label:'Bugun 20:00'},{day:today,time:'22:00',label:'Bugun 22:00'},{day:tomorrow,time:'20:00',label:'Ertaga 20:00'}].filter(item=>!filterTimeDisabled(item.day,item.time));
+  async function shareDiscovery(){
+   const url=discoveryLink(window.location.href,{sport,query,day:filterDay,time:filterTime});
+   try{if(navigator.share){await navigator.share({title:'MAYDON — maydon topish',url})}else{await navigator.clipboard.writeText(url);setMessage('Qidiruv havolasi nusxalandi. Jamoangizga yuboring.')}}catch(e){if(!(e instanceof DOMException&&e.name==='AbortError'))setMessage('Havolani ulashib boʻlmadi. Qayta urinib koʻring.')}
+  }
+- const searchFilters=<section className="search-filters" aria-label="Maydon filtrlari"><h3>Qachon oʻynaymiz?</h3><div className="quick-times" aria-label="Tezkor vaqt tanlash">{quickTimes.map(item=><button key={item.label} aria-pressed={filterDay===item.day&&filterTime===item.time} onClick={()=>{setFilterDay(item.day);setFilterTime(item.time)}}>{item.label}</button>)}<button onClick={shareDiscovery}><Send size={15}/> Qidiruvni ulashish</button></div><div className="search-filter-controls"><button className="nearby-filter" aria-pressed={nearby} disabled={locating} onClick={toggleNearby}><Compass size={17}/>{locating?'Joylashuv aniqlanmoqda…':nearby?'Eng yaqin maydonlar':'Menga yaqin'}</button><label>Sana<input type="date" min={today} max={maxDay} value={filterDay} onChange={e=>{if(e.target.value>=today&&e.target.value<=maxDay){setFilterDay(e.target.value);if(filterTime&&filterTimeDisabled(e.target.value,filterTime,Date.now()))setFilterTime('')}}}/></label><label>Boʻsh vaqt<select aria-label="Boʻsh vaqt" value={filterTime} onChange={e=>{if(!e.target.value||!filterTimeDisabled(filterDay,e.target.value,Date.now()))setFilterTime(e.target.value)}}><option value="">Istalgan vaqt</option>{Array.from({length:24},(_,h)=>{const value=`${String(h).padStart(2,'0')}:00`;const disabled=filterTimeDisabled(filterDay,value);return <option key={value} value={value} disabled={disabled}>{value}{disabled?' — tanlab boʻlmaydi':''}</option>})}</select></label>{hasFilters&&<button onClick={clearFilters}>Filtrlarni tozalash</button>}</div><p>1 soatlik bron · Oʻzbekiston vaqti (UTC+5){filterTime&&` · ${filterTime}–${String((Number(filterTime.slice(0,2))+1)%24).padStart(2,'0')}:00`}</p><p>Oʻtgan kunlar va vaqtlarni tanlab boʻlmaydi. Bron boshlanishiga kamida 5 daqiqa qolishi kerak.</p>{locationError&&<p role="alert">{locationError}</p>}{searchError&&<p role="alert">{searchError} <button onClick={()=>setSearchRetry(n=>n+1)}>Qayta tekshirish</button></p>}</section>;
+- const discoverySummary=searchTime?<div className="discovery-summary"><p role="status">{searchLoading?'Boʻsh vaqtlar tekshirilmoqda…':searchError?'Natijalar tekshirilmadi.':`${filterDay} · ${filterTime} uchun ${shown.length} ta maydon topildi.`}</p><button onClick={()=>setSearchRetry(n=>n+1)} disabled={searchLoading}><RefreshCw size={15}/> Yangilash</button><small>Boʻsh vaqtlar har 30 soniyada qayta tekshiriladi. Bron egasi tasdiqlagach kuchga kiradi.</small></div>:null;
++ const searchFilters=<section className="search-filters" aria-label="Maydon filtrlari"><h3>Qachon oʻynaymiz?</h3><div className="discovery-toolbar"><label className="search-box"><Search size={19}/><input aria-label="Maydon qidirish" placeholder="Maydon yoki manzilni qidiring…" value={query} onChange={e=>setQuery(e.target.value)}/>{query&&<button aria-label="Qidiruvni tozalash" onClick={()=>setQuery('')}><X size={17}/></button>}</label><button className="map-toggle" aria-label="Maydonlarni xaritada ko‘rish" onClick={()=>navigate('map')}><MapPin size={18}/><span>Xaritada</span></button></div><div className="quick-times" aria-label="Tezkor vaqt tanlash">{quickTimes.map(item=><button key={item.label} aria-pressed={filterDay===item.day&&filterTime===item.time} onClick={()=>{setFilterDay(item.day);setFilterTime(item.time)}}>{item.label}</button>)}</div><div className="search-filter-controls"><label>Sana<input type="date" min={today} max={maxDay} value={filterDay} onChange={e=>{if(e.target.value>=today&&e.target.value<=maxDay){setFilterDay(e.target.value);if(filterTime&&filterTimeDisabled(e.target.value,filterTime,Date.now()))setFilterTime('')}}}/></label><label>Boʻsh vaqt<select aria-label="Boʻsh vaqt" value={filterTime} onChange={e=>{if(!e.target.value||!filterTimeDisabled(filterDay,e.target.value,Date.now()))setFilterTime(e.target.value)}}><option value="">Istalgan vaqt</option>{Array.from({length:24},(_,h)=>{const value=`${String(h).padStart(2,'0')}:00`;const disabled=filterTimeDisabled(filterDay,value);return <option key={value} value={value} disabled={disabled}>{value}{disabled?' — tanlab boʻlmaydi':''}</option>})}</select></label><button className="nearby-filter" aria-pressed={nearby} disabled={locating} onClick={toggleNearby}><Compass size={17}/>{locating?'Joylashuv aniqlanmoqda…':nearby?'Eng yaqin maydonlar':'Menga yaqin'}</button><button onClick={shareDiscovery}><Send size={15}/> Ulashish</button>{hasFilters&&<button onClick={clearFilters}>Filtrlarni tozalash</button>}</div><p>1 soatlik bron · Oʻzbekiston vaqti (UTC+5){filterTime&&` · ${filterTime}–${String((Number(filterTime.slice(0,2))+1)%24).padStart(2,'0')}:00`}</p>{locationError&&<p role="alert">{locationError}</p>}{searchError&&<p role="alert">{searchError} <button onClick={()=>setSearchRetry(n=>n+1)}>Qayta tekshirish</button></p>}</section>;
++ const discoverySummary=searchTime?<div className="discovery-summary"><p role="status">{searchLoading?'Boʻsh vaqtlar tekshirilmoqda…':searchError?'Natijalar tekshirilmadi.':`${filterDay} · ${filterTime} uchun ${shown.length} ta maydon topildi.`}</p><button onClick={()=>setSearchRetry(n=>n+1)} disabled={searchLoading}><RefreshCw size={15}/> Yangilash</button><small>Boʻsh vaqtlar har 30 soniyada qayta tekshiriladi; bu doimiy real vaqt kafolati emas. Bron yuborishda server vaqtni yana tekshiradi. Bron egasi tasdiqlagach kuchga kiradi.</small></div>:null;
+  const pageTitle=(eyebrow:string,title:string,description:string)=><div className="page-title"><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>;
+- return <div className="app">
++ return <div className="app"><a className="skip-link" href="#main-content">Asosiy mazmunga oʻtish</a>
+   <header className="site-header"><button className="brand" onClick={()=>navigate('home')} aria-label="MAYDON bosh sahifa"><span className="brand-mark"><Goal size={23}/></span>MAYDON<span className="brand-dot">.</span></button><div className="header-right"><span className="location-pill"><MapPin size={14}/> Namangan</span><button className="profile-button" aria-label="Profil" onClick={()=>navigate('profile')}>{verifiedUser?verifiedUser.first_name.slice(0,1):<UserRound size={19}/>}</button></div></header>
+   {message&&<div className="notice" role="status"><span>{message}</span><button aria-label="Xabarni yopish" onClick={()=>setMessage('')}><X size={18}/></button></div>}
+-  <main>
++  <main ref={mainRef} tabIndex={-1} id="main-content">
+   {selected?<>
+    <button className="back" onClick={()=>{setSelected(null)}}><ArrowLeft size={17}/> Maydonlarga qaytish</button>
+-   <div className="detail-layout"><div><div className="detail-gallery">{selected.photos?.length?<PhotoGallery ids={selected.photos}/>:<PitchArt/>}</div><div className="detail-heading"><span className="eyebrow">{sportName(selected.sport)}</span><h1>{selected.name}</h1><p><MapPin size={16}/>{selected.address.startsWith('Xaritadagi joy:')?'Joylashuv xaritada belgilangan':selected.address}</p></div><div className="detail-facts"><div><Clock3/><span>Ish vaqti<strong>{selected.hours||'Egasi bilan aniqlashtiring'}</strong></span></div><a href={directions(selected.latitude,selected.longitude)} target="_blank" rel="noreferrer"><MapPin/><span>Manzilga borish<strong>Yoʻnalishni ochish ↗</strong></span></a>{selected.phone&&<a href={`tel:${selected.phone}`}><Phone/><span>Maydon egasi<strong>{selected.phone}</strong></span></a>}</div><VenueAmenities amenities={selected.amenities} extra_amenities={selected.extra_amenities}/></div>
++   <div className="detail-layout"><div><div className="detail-gallery">{selected.photos?.length?<PhotoGallery ids={selected.photos}/>:<VenueArt sport={selected.sport}/>}</div><div className="detail-heading"><span className="eyebrow">{sportName(selected.sport)}</span><h1>{selected.name}</h1><p><MapPin size={16}/>{selected.address.startsWith('Xaritadagi joy:')?'Joylashuv xaritada belgilangan':selected.address}</p></div><div className="detail-facts"><div><Clock3/><span>Ish vaqti<strong>{selected.hours||'Egasi bilan aniqlashtiring'}</strong></span></div><a href={directions(selected.latitude,selected.longitude)} target="_blank" rel="noreferrer"><MapPin/><span>Manzilga borish<strong>Yoʻnalishni ochish ↗</strong></span></a>{selected.phone&&<a href={`tel:${selected.phone}`}><Phone/><span>Maydon egasi<strong>{selected.phone}</strong></span></a>}</div><VenueAmenities amenities={selected.amenities} extra_amenities={selected.extra_amenities}/></div>
+    <aside className="booking-panel"><span className="eyebrow">KEYINGI OʻYININGIZ</span><h2>{price(selected.price)} <small>soʻm / soat</small></h2><div className="divider"/><BookingPicker key={selected.id} sport={selected.sport} venueId={selected.id} price={selected.price} authenticated={!!verifiedUser} botUsername={botUsername} busy={bookingBusy} revision={availabilityRevision} initialTime={searchTime||undefined} onBook={book}/></aside></div>
+   </>:<>
+   {(tab==='home'||tab==='explore')&&<>
+-   {tab==='home'?<section className="welcome"><div className="welcome-copy"><span className="eyebrow"><span className="live-dot"/> NAMANGAN · SPORT VA JAMOA</span><h1>Jamoani yigʻing.<br/><em>Maydon bizdan.</em></h1><p>Oʻzingizga mos maydonni toping.<br/>Keyingi oʻyinni birga boshlaymiz.</p><button className="hero-button" onClick={()=>{navigate('explore');setQuery('')}}>Maydon topish <ArrowUpRight size={20}/></button></div><div className="hero-visual"><PitchArt/><span className="hero-stamp"><span>OʻYIN VAQTI</span><strong>LET’S PLAY.</strong><ArrowUpRight size={24}/></span></div></section>:pageTitle('MAYDONNI KASHF ETING','Qayerda oʻynaymiz?','Sport turi, maydon nomi yoki manzil orqali izlang.')}
+-   <div className="discovery-toolbar"><label className="search-box"><Search size={19}/><input aria-label="Maydon qidirish" placeholder="Maydon yoki manzilni qidiring…" value={query} onChange={e=>setQuery(e.target.value)}/>{query&&<button aria-label="Qidiruvni tozalash" onClick={()=>setQuery('')}><X size={17}/></button>}</label><button className="map-toggle" onClick={()=>navigate('map')}><MapPin size={18}/><span>Xaritada</span></button></div>
++   <section className="welcome welcome-compact"><div className="welcome-copy"><span className="eyebrow">NAMANGAN · MAYDON</span><h1>Sportni tanlang.<br/><em>Oʻyin vaqtini belgilang.</em></h1></div><div className="welcome-icon" aria-hidden="true"><Goal size={52}/></div></section>
++   <div className="chips" aria-label="Sport turi">{sports.map(([id,label])=><button aria-pressed={sport===id} className={sport===id?'active':''} key={id} onClick={()=>setSport(id)}>{id==='all'?<SlidersHorizontal size={15}/>:<span className={`sport-icon ${id}`} aria-hidden="true">{id==='football'?'⚽':<img src={`/icons/${id==='table_tennis'?'table-tennis':'billiards'}.svg`} alt="" width={22} height={22}/>}</span>}{label}</button>)}</div>
++
+    {searchFilters}
+    {discoverySummary}
+-   <div className="chips" aria-label="Sport turi">{sports.map(([id,label])=><button aria-pressed={sport===id} className={sport===id?'active':''} key={id} onClick={()=>setSport(id)}>{id==='all'?<SlidersHorizontal size={15}/>:<span className={`sport-icon ${id}`} aria-hidden="true">{id==='football'?'⚽':<img src={`/icons/${id==='table_tennis'?'table-tennis':'billiards'}.svg`} alt="" width={22} height={22}/>}</span>}{label}</button>)}</div>
+-   <div className="section-heading"><div><span className="eyebrow">SIZ UCHUN</span><h2>{hasFilters?'Qidiruv natijalari':'Oʻyin shu yerdan boshlanadi'}</h2></div><span className="count">{searchLoading?'Tekshirilmoqda…':searchError?'—':`${shown.length} ta maydon`}</span></div>
+-   {loading||searchLoading?<div className="venue-grid" aria-label="Yuklanmoqda">{[1,2,3].map(i=><div key={i} className="skeleton"/>)}</div>:searchError?<Empty title="Vaqtlarni tekshirib boʻlmadi">Filtrdagi vaqtni oʻzgartiring yoki qayta tekshiring.</Empty>:shown.length?<div className="venue-grid">{shown.map(venueCard)}</div>:<Empty title={hasFilters?'Mos maydon topilmadi':'Birinchi maydonni kutyapmiz'} action={<button className="secondary" onClick={()=>hasFilters?clearFilters():navigate('owner')}>{hasFilters?'Filtrlarni tozalash':'Maydonimni qoʻshish'}<ArrowRight size={16}/></button>}>{hasFilters?'Boshqa sana, vaqt yoki qidiruv soʻzini sinab koʻring.':'Maydon egasimisiz? Joyingizni taqdim eting va yangi oʻyinchilarni kutib oling.'}</Empty>}
++
++   <div className="section-heading"><div><span className="eyebrow">SIZ UCHUN</span><h2>{hasFilters?'Qidiruv natijalari':'Oʻyin shu yerdan boshlanadi'}</h2></div><span className="count">{loading||(searchLoading&&availabilityKey!==searchTime)?'Tekshirilmoqda…':venueError||searchError?'—':`${shown.length} ta maydon`}</span></div>
++   {loading||(searchLoading&&availabilityKey!==searchTime)?<div className="venue-grid" role="status" aria-label="Yuklanmoqda">{[1,2,3].map(i=><div key={i} className="skeleton"/>)}</div>:venueError?<Empty title="Maydonlar yuklanmadi" action={<button className="secondary" onClick={loadVenues}>Qayta yuklash</button>}>{venueError}</Empty>:searchError?<Empty title="Vaqtlarni tekshirib boʻlmadi">Filtrdagi vaqtni oʻzgartiring yoki qayta tekshiring.</Empty>:shown.length?<div className="venue-grid" aria-busy={searchLoading}>{shown.map(venueCard)}</div>:<Empty title={hasFilters?'Mos maydon topilmadi':'Birinchi maydonni kutyapmiz'} action={<button className="secondary" onClick={()=>hasFilters?clearFilters():navigate('owner')}>{hasFilters?'Filtrlarni tozalash':'Maydonimni qoʻshish'}<ArrowRight size={16}/></button>}>{hasFilters?'Boshqa sana, vaqt yoki qidiruv soʻzini sinab koʻring.':'Maydon egasimisiz? Joyingizni taqdim eting va yangi oʻyinchilarni kutib oling.'}</Empty>}
+    <section className="owner-banner"><div className="owner-banner-icon"><Goal size={30}/></div><div><span className="eyebrow">MAYDON EGALARI UCHUN</span><h3>Sizning maydon. Yangi jamoalar.</h3><p>Maydoningizni joylang, bronlarni bir joyda boshqaring.</p></div><button onClick={()=>navigate('owner')}>Maydon qoʻshish <Plus size={18}/></button></section>
+   </>}
+-  {tab==='map'&&<>{pageTitle('YAQIN ATROFDA','Maydonlar xaritada','Tasdiqlangan maydonlarning aniq joylashuvini koʻring.')}{searchFilters}{discoverySummary}{searchLoading?<p role="status">Vaqtlar tekshirilmoqda…</p>:!searchError&&<MapView venues={shown} onSelect={setSelected}/>}<div className="section-heading"><h2>Maydonlar</h2><span className="count">{searchLoading?'Tekshirilmoqda…':searchError?'—':`${shown.length} ta`}</span></div><div className="venue-grid">{shown.map(venueCard)}</div></>}
++  {tab==='map'&&<>{pageTitle('YAQIN ATROFDA','Maydonlar xaritada','Tasdiqlangan maydonlarning aniq joylashuvini koʻring.')}{searchFilters}{discoverySummary}{venueError?<Empty title="Maydonlar yuklanmadi" action={<button className="secondary" onClick={loadVenues}>Qayta yuklash</button>}>{venueError}</Empty>:searchLoading?<p role="status">Vaqtlar tekshirilmoqda…</p>:!searchError&&!venueError&&!loading&&<MapView venues={shown} onSelect={openVenue}/>}<div className="section-heading"><h2>Maydonlar</h2><span className="count">{loading||(searchLoading&&availabilityKey!==searchTime)?'Tekshirilmoqda…':venueError||searchError?'—':`${shown.length} ta`}</span></div><div className="venue-grid" aria-busy={searchLoading}>{shown.map(venueCard)}</div></>}
+   {tab==='bookings'&&<>{pageTitle('SIZNING OʻYINLARINGIZ','Bronlarim','Rejalashtirilgan oʻyinlar va soʻrovlaringiz shu yerda.')}<button className="back" onClick={loadBookings}><RefreshCw size={15}/> Yangilash</button>{!verifiedUser?loginPanel:myBookings.length?<div className="booking-list">{myBookings.map(b=><article className="booking-card" key={b.id}><div className="date-tile"><span>{new Date(b.start_at).toLocaleDateString('uz-UZ',{month:'short',timeZone:'Asia/Tashkent'})}</span><strong>{new Date(b.start_at).toLocaleDateString('uz-UZ',{day:'numeric',timeZone:'Asia/Tashkent'})}</strong></div><div className="booking-card-body"><Status value={b.status}/><h3>{b.venue_name}</h3><p><Clock3 size={14}/>{new Date(b.start_at).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tashkent'})} · 1 soat</p></div>{b.status==='pending'&&<button className="text-danger" onClick={()=>decide(`/bookings/${b.id}/cancel`,loadBookings)}>Bekor qilish</button>}</article>)}</div>:<Empty title="Keyingi oʻyiningiz hali oldinda" action={<button className="primary compact" onClick={()=>navigate('explore')}>Maydon topish <ArrowRight size={16}/></button>}>Maydon tanlang va birinchi bron soʻrovingizni yuboring.</Empty>}</>}
+   {tab==='profile'&&<>{pageTitle('SHAXSIY KABINET','Profil','Hisobingiz, maydonlaringiz va barcha bronlaringiz.')}{!verifiedUser?loginPanel:<><div className="profile-card"><div className="avatar">{verifiedUser.first_name.slice(0,1)}</div><div><h2>{verifiedUser.first_name}</h2><p><ShieldCheck size={15}/> Telegram hisobi tasdiqlangan</p></div></div><div className="profile-links"><button onClick={()=>navigate('owner')}><span className="menu-icon"><Goal/></span><span><strong>Maydon egasi paneli</strong><small>Maydon qoʻshish va bronlarni boshqarish</small></span><ArrowUpRight/></button><button onClick={()=>navigate('bookings')}><span className="menu-icon"><CalendarDays/></span><span><strong>Bronlar tarixi</strong><small>Oʻyinlaringiz va bron holati</small></span><ArrowUpRight/></button>{isAdmin&&<button onClick={()=>navigate('admin')}><span className="menu-icon"><ShieldCheck/></span><span><strong>Admin paneli</strong><small>Maydonlar, arizalar va bronlarni boshqarish</small></span><ArrowUpRight/></button>}</div></>}</>}
+   {tab==='owner'&&<><button className="back" onClick={()=>navigate('profile')}><ArrowLeft size={16}/> Profil</button>{!verifiedUser?loginPanel:<OwnerPanel onExpired={()=>{setVerifiedUser(null);setIsAdmin(false)}} onChange={loadVenues}/>}</>}
+@@ -113,7 +120,7 @@
+   </>}
+   <footer className="site-footer"><span>MAYDON.</span><p>Yaxshi oʻyin — yaxshi maydondan.</p><small>Namangan, Oʻzbekiston</small></footer>
+   </main>
+-  <nav className="bottom-nav" aria-label="Asosiy menyu">{([['home',House,'Bosh sahifa'],['explore',Compass,'Qidiruv'],['map',MapPin,'Xarita'],['bookings',CalendarDays,'Bronlar'],['profile',UserRound,'Profil']] as const).map(([id,Icon,label])=><button key={id} className={tab===id||(id==='profile'&&(tab==='owner'||tab==='admin'))?'on':''} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={21}/><span>{label}</span></button>)}</nav>
++  <nav ref={navRef} className="bottom-nav" aria-label="Asosiy menyu">{([['home',House,'Bosh sahifa'],['explore',Compass,'Qidiruv'],['map',MapPin,'Xarita'],['bookings',CalendarDays,'Bronlar'],['profile',UserRound,'Profil']] as const).map(([id,Icon,label])=><button key={id} className={tab===id||(id==='profile'&&(tab==='owner'||tab==='admin'))?'on':''} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={21}/><span>{label}</span></button>)}</nav>
+  </div>
+ }
+ createRoot(document.getElementById('root')!).render(<App/>);
+--- a/miniapp/src/booking.tsx
++++ b/miniapp/src/booking.tsx
+@@ -19,8 +19,8 @@
+   return()=>controller.abort();
+  },[venueId,day,revision,retry]);
+  const days=Array.from({length:7},(_,index)=>{const date=new Date(`${today}T12:00:00+05:00`);date.setUTCDate(date.getUTCDate()+index);return {value:localDate(date),date}});
+- const chosen=slots.find(slot=>slot.start_at===time);
+- const signIn=`https://t.me/${botUsername}?start=book_${venueId}${time?'_'+Math.floor(new Date(time).getTime()/1000):''}`;
++ const chosen=!loading&&!error&&time.startsWith(day)?slots.find(slot=>slot.start_at===time&&slot.status==='available'&&new Date(slot.start_at).getTime()>Date.now()+300000):undefined;
++ const signIn=`https://t.me/${botUsername}?start=book_${venueId}${chosen?'_'+Math.floor(new Date(chosen.start_at).getTime()/1000):''}`;
+  return <div className="booking-picker">
+   <div className="booking-step"><b>1</b><h3>Kunni tanlang</h3></div>
+   <div className="day-strip">{days.map(({value,date},index)=><button key={value} type="button" disabled={busy} aria-pressed={day===value} onClick={()=>setDay(value)} className={day===value?'selected':''}><small>{index===0?'Bugun':index===1?'Ertaga':weekdays[date.getUTCDay()]}</small><strong>{date.toLocaleDateString('uz-UZ',{day:'numeric',timeZone:'Asia/Tashkent'})}</strong></button>)}</div>
+@@ -29,7 +29,7 @@
+   <p className="slot-hours"><Clock3 size={14}/> Ish vaqti: {hours||'Egasi bilan aniqlashtiring'}</p>
+   {loading?<p className="slot-loading" role="status">Vaqtlar tekshirilmoqda…</p>:error?<div role="alert">{error}<button className="back" onClick={()=>setRetry(n=>n+1)}><RefreshCw size={14}/> Qayta yuklash</button></div>:<><div className="time-grid">{slots.map(slot=><button type="button" key={slot.start_at} disabled={busy||slot.status!=='available'} aria-pressed={time===slot.start_at} aria-label={`${slot.label}${slot.status==='booked'?' — band':slot.status!=='available'?' — mavjud emas':''}`} className={`${time===slot.start_at?'selected ':''}${slot.status==='booked'?'booked':''}`} onClick={()=>setTime(slot.start_at)}>{slot.label}{slot.status==='booked'&&<small>Band</small>}</button>)}</div><p className="field-help">Band vaqtlarni tanlab boʻlmaydi. Yopiq soatlar avtomatik cheklangan. Bron egasi tasdiqlagach kuchga kiradi.</p></>}
+   {['table_tennis','billiards'].includes(sport||'')&&<p className="field-help">Charchaguncha oʻynash: avval 1 soat band qilinadi. Keyingi soat boʻsh boʻlsa, egasi bilan uzaytiring. Keyingi bron boʻlsa, seansni oʻz vaqtida tugatish shart. Har bir qoʻshimcha soat alohida toʻlanadi.</p>}
+-  {chosen&&<div className="booking-summary"><div><strong>{dateLabel(time)} · {chosen.label}</strong><span>1 soat</span></div><strong>{new Intl.NumberFormat('uz-UZ').format(price)} soʻm</strong></div>}
+-  {authenticated?<><BookingContact venueId={venueId} time={time} botUsername={botUsername} onChange={setContactPhone}/><button className="primary" disabled={!chosen||!contactPhone||busy||loading} onClick={()=>onBook(time)}>{busy?'Yuborilmoqda…':!chosen?'Kunni va vaqtni tanlang':!contactPhone?'Avval telefon raqamingizni ulashing':'Bron soʻrovi yuborish'}<ArrowRight size={18}/></button></>:<div className="booking-login"><p>Telegram hisobingiz bilan davom eting. Botdagi tugma sizni shu maydonga qaytaradi.</p>{botUsername?<a href={signIn} className="primary"><Send size={17}/> Telegramda bron qilish</a>:<p>Telegram botining menyusidan MAYDONni oching.</p>}</div>}
++  {chosen&&<div className="booking-summary"><div><strong>{dateLabel(time)} · {chosen.label}</strong><span>1 soat · {chosen.label}–{new Date(new Date(time).getTime()+3600000).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tashkent'})}</span></div><strong>{new Intl.NumberFormat('uz-UZ').format(price)} soʻm</strong></div>}
++  <p className="booking-explanation">Bu bron soʻrovi. Maydon egasi tasdiqlagach, broningiz kuchga kiradi.</p>{authenticated?<><BookingContact venueId={venueId} time={chosen?.start_at||''} botUsername={botUsername} onChange={setContactPhone}/><button className="primary" disabled={!chosen||!contactPhone||busy||loading||!!error} onClick={()=>onBook(time)}>{busy?'Yuborilmoqda…':!chosen?'Kunni va vaqtni tanlang':!contactPhone?'Avval telefon raqamingizni ulashing':'Bron soʻrovi yuborish'}<ArrowRight size={18}/></button></>:<div className="booking-login"><p>Telegram hisobingiz bilan davom eting. Botdagi tugma sizni shu maydonga qaytaradi.</p>{botUsername?<a href={signIn} className="primary"><Send size={17}/> Telegramda bron qilish</a>:<p>Telegram botining menyusidan MAYDONni oching.</p>}</div>}
+  </div>;
+ }
+--- a/miniapp/src/owner-panel.tsx
++++ b/miniapp/src/owner-panel.tsx
+@@ -12,7 +12,7 @@
+ async function request(path:string,body?:unknown){const r=await fetch(`${API}${path}`,{headers:{...authHeaders(),...(body!==undefined?{'Content-Type':'application/json'}:{})},...(body!==undefined?{method:'POST',body:JSON.stringify(body)}:{})});const data=await r.json();if(!r.ok)throw Error(r.status===401?'Telegram orqali qayta kiring.':typeof data.detail==='string'?data.detail:'Maʼlumotlarni tekshiring.');return data;}
+ 
+ export function OwnerPanel({onExpired,onChange}:{onExpired:()=>void;onChange:()=>void}){
+- const [tab,setTab]=useState('schedule');const [venues,setVenues]=useState<Venue[]>([]);const [venue,setVenue]=useState('');const [revision,setRevision]=useState(0);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
++ const [scheduleEpoch,setScheduleEpoch]=useState(0);const [tab,setTab]=useState('schedule');const [historyStatus,setHistoryStatus]=useState('');const [venues,setVenues]=useState<Venue[]>([]);const [venue,setVenue]=useState('');const [revision,setRevision]=useState(0);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
+  const [overview,setOverview]=useState<{today:number;pending:number;value:number;unpaid:number}|null>(null);
+  const [editor,setEditor]=useState<Venue|'new'|null>(null);
+  useEffect(()=>{const controller=new AbortController();setLoading(true);setError('');Promise.all(['/owner/venues','/owner/overview'].map(path=>fetch(`${API}${path}`,{headers:authHeaders(),signal:controller.signal}).then(async r=>{if(!r.ok)throw Error(r.status===401?'Telegram orqali qayta kiring.':'Panel yuklanmadi.');return r.json()}))).then(([v,o])=>{if(controller.signal.aborted)return;setVenues(v);setOverview(o);setVenue(old=>v.some((item:Venue)=>String(item.id)===old)?old:v[0]?String(v[0].id):'')}).catch(e=>{if(!controller.signal.aborted)setError(e.message)}).finally(()=>{if(!controller.signal.aborted)setLoading(false)});return()=>controller.abort()},[revision]);
+@@ -20,11 +20,11 @@
+  return <section className="owner-workspace">
+   <div className="section-heading"><div><span className="eyebrow">MAYDON EGASI UCHUN</span><h1>Boshqaruv paneli</h1><p className="muted">Jadval, bronlar va toʻlovlar · Oʻzbekiston vaqti</p></div><button className="primary" onClick={()=>{setEditor('new');setTab('venues')}}>+ Maydon qoʻshish</button></div>
+   {error&&<p role="alert">{error} <button onClick={refresh}>Qayta yuklash</button></p>}
+-  {overview&&<div className="analytics-metrics"><div><span>Bugungi bronlar</span><strong>{overview.today}</strong></div><div><span>Yangi soʻrovlar</span><strong>{overview.pending}</strong></div><div><span>Bugungi bron qiymati</span><strong>{overview.value.toLocaleString('uz-UZ')} <small>soʻm</small></strong><small>Toʻlangan tushum emas</small></div><div><span>Toʻlanmagan bronlar</span><strong>{overview.unpaid}</strong></div></div>}
+-  <nav className="owner-tabs" aria-label="Egasi paneli boʻlimlari">{[['schedule','Jadval'],['history','Bronlar va toʻlovlar'],['venues','Maydonlar'],['analytics','Tahlil']].map(([id,label])=><button key={id} aria-pressed={tab===id} onClick={()=>setTab(id)}>{label}</button>)}</nav>
++  {overview&&<div className="analytics-metrics"><button className="owner-metric" onClick={()=>{setScheduleEpoch(n=>n+1);setTab('schedule')}}><span>Bugungi bronlar</span><strong>{overview.today}</strong><small>Jadvalni ochish →</small></button><button className="owner-metric" onClick={()=>{setHistoryStatus('pending');setTab('history')}}><span>Yangi soʻrovlar</span><strong>{overview.pending}</strong><small>Koʻrib chiqish →</small></button><div><span>Bugungi bron qiymati</span><strong>{overview.value.toLocaleString('uz-UZ')} <small>soʻm</small></strong><small>Toʻlangan tushum emas</small></div><div><span>Toʻlanmagan bronlar</span><strong>{overview.unpaid}</strong></div></div>}
++  <nav className="owner-tabs" aria-label="Egasi paneli boʻlimlari">{[['schedule','Jadval'],['history','Bronlar va toʻlovlar'],['venues','Maydonlar'],['analytics','Tahlil']].map(([id,label])=><button key={id} aria-pressed={tab===id} onClick={()=>{setHistoryStatus('');setTab(id)}}>{label}</button>)}</nav>
+   {loading&&!venues.length?<p role="status">Yuklanmoqda…</p>:<>
+-   {tab==='schedule'&&(venues.length?<><label className="owner-venue-select">Maydon<select value={venue} onChange={e=>setVenue(e.target.value)}>{venues.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label>{venue&&<Schedule key={venue} venue={venues.find(v=>v.id===Number(venue))!} revision={revision} refresh={refresh}/>}</>:<p>Jadvalni boshqarish uchun birinchi maydoningizni qoʻshing.</p>)}
+-   {tab==='history'&&<History venues={venues} revision={revision} refresh={refresh}/>}
++   {tab==='schedule'&&(venues.length?<><label className="owner-venue-select">Maydon<select value={venue} onChange={e=>setVenue(e.target.value)}>{venues.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label>{venue&&<Schedule key={`${venue}-${scheduleEpoch}`} venue={venues.find(v=>v.id===Number(venue))!} revision={revision} refresh={refresh}/>}</>:<p>Jadvalni boshqarish uchun birinchi maydoningizni qoʻshing.</p>)}
++   {tab==='history'&&<History key={historyStatus} initialStatus={historyStatus} venues={venues} revision={revision} refresh={refresh}/>}
+    {tab==='analytics'&&<AnalyticsPanel scope="owner" revision={revision}/>}
+    {tab==='venues'&&<>{editor!==null?<div className="owner-form-card"><button className="back" onClick={()=>setEditor(null)}>← Maydonlarga qaytish</button><OwnerForm key={editor==='new'?'new':editor.id} initial={editor==='new'?undefined:editor} onCancel={()=>setEditor(null)} onExpired={onExpired} onSaved={()=>{setEditor(null);refresh();onChange()}}/></div>:<div className="owner-venue-list">{venues.length?venues.map(v=><article className="setting" key={v.id}><span className={`status status-${v.status}`}>{labels[v.status]||v.status}</span><h2>{v.name}</h2><p>{v.hours||'24/7'} · {v.price.toLocaleString('uz-UZ')} soʻm / soat</p>{v.suspended&&<p>Admin tomonidan vaqtincha toʻxtatilgan.</p>}{v.review_reason&&<p>{v.review_reason}</p>}<PhotoGallery ids={v.photos}/><OwnerVenueActions venue={v} onEdit={()=>setEditor(v)} onDeleted={()=>{refresh();onChange()}}/></article>):<p>Hozircha maydonlar yoʻq. “Maydon qoʻshish” orqali boshlang.</p>}</div>}</>}
+   </>}
+@@ -53,14 +53,14 @@
+   <div className="owner-toolbar"><button disabled={busy} onClick={()=>setDay(shift(day,-days))}>← Oldingi</button><label>Sana<input type="date" required value={day} onChange={e=>{if(e.target.value)setDay(e.target.value)}}/></label><button disabled={busy} onClick={()=>setDay(today())}>Bugun</button><button disabled={busy} onClick={()=>setDay(shift(day,days))}>Keyingi →</button><label>Koʻrinish<select value={days} onChange={e=>setDays(Number(e.target.value))}><option value={1}>Kunlik</option><option value={7}>Haftalik</option></select></label><button disabled={busy||loading} onClick={()=>setRetry(n=>n+1)}>Yangilash</button></div>
+   <details className="owner-hours"><summary>Ish vaqti: {venue.hours||'24/7'} · Oʻzgartirish</summary><form onSubmit={e=>{e.preventDefault();mutate(`/owner/venues/${venue.id}/hours`,{hours},'Ish vaqti saqlandi.')}}><label>Har kungi ish vaqti<input required value={hours} maxLength={120} placeholder="08:00–23:00" onChange={e=>setHours(e.target.value)}/></label><p>Masalan: 08:00–23:00, tun uchun 18:00–02:00 yoki 24/7. Bronlar 1 soatlik. Mavjud bronlarga zid oʻzgarish saqlanmaydi.</p><button disabled={busy}>Saqlash</button></form></details>
+   {notice&&<p role="status">{notice}</p>}{error&&<p role="alert">{error}</p>}
+-  <p className="muted">Boʻsh soatni bosib bron kiriting yoki vaqtni yoping. Yopilgan vaqtni bosib qayta oching.</p>
+-  {loading?<p role="status">Jadval yuklanmoqda…</p>:<div className="owner-calendar-scroll"><div className={`owner-calendar ${days===7?'week':''}`}>{Array.from({length:days},(_,i)=><section key={i}><h3>{shift(day,i).split('-').reverse().join('.')}</h3>{slots.slice(i*24,i*24+24).map(s=><button key={s.start_at} disabled={busy||['past','closed','unavailable'].includes(s.status)} className={`owner-slot ${s.status} ${s.booking?.status||''}`} aria-pressed={selected?.start_at===s.start_at} onClick={()=>{setSelected(s);setError('');setNotice('')}}><time>{s.start_at.slice(11,16)}</time><span>{s.booking?`${labels[s.booking.status]} · ${s.booking.customer_name||'#'+s.booking.id}`:labels[s.status]}</span></button>)}</section>)}</div></div>}
+-  {active&&<section className="owner-slot-editor" aria-label="Tanlangan vaqt"><div className="section-heading"><h3>{stamp(active.start_at)}</h3><button disabled={busy} onClick={()=>setSelected(null)}>Yopish</button></div>{active.booking?<BookingCard booking={active.booking} refresh={refresh}/>:active.block?<><p>Yopilgan: {active.block.reason||'Sabab koʻrsatilmagan'}</p><button disabled={busy} onClick={()=>mutate(`/owner/blocks/${active.block!.id}/remove`,{},'Vaqt ochildi.')}>Vaqtni ochish</button></>:<form onSubmit={e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget));mutate(kind==='booking'?'/owner/manual-bookings':'/owner/blocks',{...data,venue_id:venue.id,start_at:active.start_at},kind==='booking'?'Bron saqlandi.':'Vaqt yopildi.')}}><fieldset disabled={busy}><label>Amal<select value={kind} onChange={e=>setKind(e.target.value)}><option value="booking">Telefon / joyida bron</option><option value="block">Vaqtni yopish</option></select></label>{kind==='booking'?<><label>Mijoz ismi<input name="customer_name" required maxLength={120}/></label><label>Mijoz telefoni<input name="customer_phone" type="tel" required pattern="[+0-9 ()\-]{7,40}" maxLength={40}/></label><p>{venue.price.toLocaleString('uz-UZ')} soʻm · 1 soat. Darhol tasdiqlanadi. Qoʻlda kiritilgan mijozga Telegram xabari yuborilmaydi.</p></>:<label>Sabab<input name="reason" maxLength={300} placeholder="Taʼmirlash, shaxsiy tadbir…"/></label>}<button className="primary" disabled={busy}>{busy?'Saqlanmoqda…':'Saqlash'}</button></fieldset></form>}</section>}
++  <div className="owner-quick-actions" aria-label="Jadval amallari"><button aria-pressed={kind==='booking'} onClick={()=>setKind('booking')}>+ Qoʻlda bron</button><button aria-pressed={kind==='block'} onClick={()=>setKind('block')}>Vaqtni yopish</button></div><p className="muted">{kind==='booking'?'Qoʻlda bron uchun boʻsh soatni tanlang.':'Yopish uchun boʻsh soatni tanlang.'} Yopilgan vaqtni bosib qayta oching.</p><div className="schedule-legend" aria-label="Jadval holatlari"><span>Boʻsh</span><span>Kutilmoqda</span><span>Tasdiqlangan</span><span>Yopilgan</span></div>
++  {loading?<p role="status">Jadval yuklanmoqda…</p>:<div className="owner-calendar-scroll"><div className={`owner-calendar ${days===7?'week':''}`}>{Array.from({length:days},(_,i)=><section key={i}><h3>{shift(day,i).split('-').reverse().join('.')}</h3>{slots.slice(i*24,i*24+24).map(s=><button key={s.start_at} disabled={busy||['past','closed','unavailable'].includes(s.status)} className={`owner-slot ${s.status} ${s.booking?.status||''}`} aria-pressed={selected?.start_at===s.start_at} onClick={()=>{setSelected(s);setError('');setNotice('');requestAnimationFrame(()=>document.getElementById('owner-slot-editor')?.scrollIntoView({behavior:'smooth',block:'start'}))}}><time>{s.start_at.slice(11,16)}</time><span>{s.booking?`${labels[s.booking.status]} · ${s.booking.customer_name||'#'+s.booking.id}`:labels[s.status]}</span></button>)}</section>)}</div></div>}
++  {active&&<section id="owner-slot-editor" className="owner-slot-editor" aria-label="Tanlangan vaqt"><div className="section-heading"><h3>{stamp(active.start_at)}</h3><button disabled={busy} onClick={()=>setSelected(null)}>Yopish</button></div>{active.booking?<BookingCard booking={active.booking} refresh={refresh}/>:active.block?<><p>Yopilgan: {active.block.reason||'Sabab koʻrsatilmagan'}</p><button disabled={busy} onClick={()=>mutate(`/owner/blocks/${active.block!.id}/remove`,{},'Vaqt ochildi.')}>Vaqtni ochish</button></>:<form onSubmit={e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.currentTarget));mutate(kind==='booking'?'/owner/manual-bookings':'/owner/blocks',{...data,venue_id:venue.id,start_at:active.start_at},kind==='booking'?'Bron saqlandi.':'Vaqt yopildi.')}}><fieldset disabled={busy}><label>Amal<select value={kind} onChange={e=>setKind(e.target.value)}><option value="booking">Telefon / joyida bron</option><option value="block">Vaqtni yopish</option></select></label>{kind==='booking'?<><label>Mijoz ismi<input name="customer_name" required maxLength={120}/></label><label>Mijoz telefoni<input name="customer_phone" type="tel" required pattern="[+0-9 ()\-]{7,40}" maxLength={40}/></label><p>{venue.price.toLocaleString('uz-UZ')} soʻm · 1 soat. Darhol tasdiqlanadi. Qoʻlda kiritilgan mijozga Telegram xabari yuborilmaydi.</p></>:<label>Sabab<input name="reason" maxLength={300} placeholder="Taʼmirlash, shaxsiy tadbir…"/></label>}<button className="primary" disabled={busy}>{busy?'Saqlanmoqda…':'Saqlash'}</button></fieldset></form>}</section>}
+  </>;
+ }
+ 
+-function History({venues,revision,refresh}:{venues:Venue[];revision:number;refresh:()=>void}){
+- const [query,setQuery]=useState('');const [offset,setOffset]=useState(0);const [rows,setRows]=useState<Booking[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [retry,setRetry]=useState(0);
++function History({venues,revision,refresh,initialStatus=''}:{venues:Venue[];revision:number;refresh:()=>void;initialStatus?:string}){
++ const [query,setQuery]=useState(initialStatus?`status=${initialStatus}`:'');const [offset,setOffset]=useState(0);const [rows,setRows]=useState<Booking[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [retry,setRetry]=useState(0);
+  useEffect(()=>{const controller=new AbortController();setLoading(true);setError('');setRows([]);fetch(`${API}/owner/bookings?${query}&offset=${offset}`,{headers:authHeaders(),signal:controller.signal}).then(async r=>{if(!r.ok)throw Error('Bronlar yuklanmadi. Sanalarni tekshiring yoki qayta kiring.');return r.json()}).then(data=>{if(!controller.signal.aborted)setRows(data)}).catch(e=>{if(!controller.signal.aborted)setError(e.message)}).finally(()=>{if(!controller.signal.aborted)setLoading(false)});return()=>controller.abort()},[query,offset,revision,retry]);
+- return <><form className="analytics-filters" onSubmit={e=>{e.preventDefault();const params=new URLSearchParams();new FormData(e.currentTarget).forEach((v,k)=>{if(v)params.set(k,String(v))});setQuery(params.toString());setOffset(0);setRetry(n=>n+1)}}><label>Maydon<select name="venue_id"><option value="">Barchasi (arxiv ham)</option>{venues.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label><label>Holat<select name="status"><option value="">Barchasi</option>{['pending','confirmed','cancelled','rejected'].map(s=><option key={s} value={s}>{labels[s]}</option>)}</select></label><label>Dan<input name="from_date" type="date"/></label><label>Gacha<input name="to_date" type="date"/></label><label>Qidirish<input name="search" maxLength={100} placeholder="Ism, telefon yoki bron #"/></label><button>Qidirish</button></form><p className="muted">Toʻlov holati — egasi kiritgan qayd. Ilova pul yechmaydi yoki qaytarmaydi.</p>{error&&<p role="alert">{error}<button onClick={()=>setRetry(n=>n+1)}>Qayta yuklash</button></p>}{loading?<p role="status">Yuklanmoqda…</p>:rows.length?<div className="owner-booking-list">{rows.map(b=><BookingCard key={b.id} booking={b} refresh={refresh}/>)}</div>:!error&&<p>Bu filtrlar boʻyicha bronlar topilmadi.</p>}<div className="owner-toolbar"><button disabled={loading||offset===0} onClick={()=>setOffset(n=>Math.max(0,n-50))}>← Oldingi</button><span>{Math.floor(offset/50)+1}-sahifa</span><button disabled={loading||rows.length<50} onClick={()=>setOffset(n=>n+50)}>Keyingi →</button></div></>;
++ return <><form className="analytics-filters" onSubmit={e=>{e.preventDefault();const params=new URLSearchParams();new FormData(e.currentTarget).forEach((v,k)=>{if(v)params.set(k,String(v))});setQuery(params.toString());setOffset(0);setRetry(n=>n+1)}}><label>Maydon<select name="venue_id"><option value="">Barchasi (arxiv ham)</option>{venues.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label><label>Holat<select name="status" defaultValue={initialStatus}><option value="">Barchasi</option>{['pending','confirmed','cancelled','rejected'].map(s=><option key={s} value={s}>{labels[s]}</option>)}</select></label><label>Dan<input name="from_date" type="date"/></label><label>Gacha<input name="to_date" type="date"/></label><label>Qidirish<input name="search" maxLength={100} placeholder="Ism, telefon yoki bron #"/></label><button>Qidirish</button></form><p className="muted">Toʻlov holati — egasi kiritgan qayd. Ilova pul yechmaydi yoki qaytarmaydi.</p>{error&&<p role="alert">{error}<button onClick={()=>setRetry(n=>n+1)}>Qayta yuklash</button></p>}{loading?<p role="status">Yuklanmoqda…</p>:rows.length?<div className="owner-booking-list">{rows.map(b=><BookingCard key={b.id} booking={b} refresh={refresh}/>)}</div>:!error&&<p>Bu filtrlar boʻyicha bronlar topilmadi.</p>}<div className="owner-toolbar"><button disabled={loading||offset===0} onClick={()=>setOffset(n=>Math.max(0,n-50))}>← Oldingi</button><span>{Math.floor(offset/50)+1}-sahifa</span><button disabled={loading||rows.length<50} onClick={()=>setOffset(n=>n+50)}>Keyingi →</button></div></>;
+ }
+--- a/miniapp/src/contact.tsx
++++ b/miniapp/src/contact.tsx
+@@ -5,7 +5,7 @@
+ export function BookingContact({venueId,time,botUsername,onChange}:{venueId:number;time:string;botUsername:string;onChange:(phone:string|null)=>void}){
+  const [phone,setPhone]=useState<string|null>(null);const [waiting,setWaiting]=useState(false);const [error,setError]=useState('');
+  useEffect(()=>{let active=true;
+-  async function refresh(){try{const response=await fetch(`${API}/auth/contact`,{headers:authHeaders()});if(!response.ok)throw Error();const data=await response.json();if(active){setPhone(data.phone);onChange(data.phone);}}catch{if(active)setError('Raqamni tekshirib boʻlmadi. Telegramdan qayta oching.');}}
++  async function refresh(){try{const response=await fetch(`${API}/auth/contact`,{headers:authHeaders()});if(!response.ok)throw Error();const data=await response.json();if(active){setPhone(data.phone);onChange(data.phone);setError('');}}catch{if(active)setError('Raqamni tekshirib boʻlmadi. Telegramdan qayta oching.');}}
+   refresh();window.addEventListener('focus',refresh);return()=>{active=false;window.removeEventListener('focus',refresh)};
+  },[onChange]);
+  useEffect(()=>{if(!waiting)return;let active=true;let count=0;
+--- a/miniapp/src/owner.tsx
++++ b/miniapp/src/owner.tsx
+@@ -18,15 +18,15 @@
+ export const mapLocation = (lat:number, lon:number) => `https://yandex.com/maps/?${new URLSearchParams({ll:`${lon},${lat}`,pt:`${lon},${lat}`,z:'18',l:'map'})}`;
+ 
+ export function PhotoGallery({ids=[]}:{ids?:number[]}) {
+- return <div className="photos">{ids.map(id=><PitchPhoto key={id} id={id}/>)}</div>;
++ return <div className="photos" tabIndex={ids.length>1?0:undefined} role={ids.length>1?'group':undefined} aria-label={ids.length>1?'Maydon rasmlari — yon tomonga suring':undefined}>{ids.map(id=><PitchPhoto key={id} id={id}/>)}</div>;
+ }
+ function PitchPhoto({id}:{id:number}) {
+- const [url,setUrl]=useState('');
+- useEffect(()=>{let active=true;let objectUrl='';const abort=new AbortController();
+-  fetch(`${API}/photos/${id}`,{headers:authHeaders(),signal:abort.signal}).then(r=>{if(!r.ok)throw Error();return r.blob()}).then(blob=>{if(active){objectUrl=URL.createObjectURL(blob);setUrl(objectUrl)}}).catch(()=>{});
++ const [url,setUrl]=useState('');const [failed,setFailed]=useState(false);
++ useEffect(()=>{setUrl('');setFailed(false);let active=true;let objectUrl='';const abort=new AbortController();
++  fetch(`${API}/photos/${id}`,{headers:authHeaders(),signal:abort.signal}).then(r=>{if(!r.ok)throw Error();return r.blob()}).then(blob=>{if(active){objectUrl=URL.createObjectURL(blob);setUrl(objectUrl)}}).catch(()=>{if(active&&!abort.signal.aborted)setFailed(true)});
+   return()=>{active=false;abort.abort();if(objectUrl)URL.revokeObjectURL(objectUrl)};
+  },[id]);
+- return url?<img src={url} alt="Maydon rasmi"/>:<span>Rasm yuklanmoqda…</span>;
++ return failed?<span className="photo-unavailable">Rasm mavjud emas</span>:url?<img src={url} onError={()=>setFailed(true)} alt="Maydon rasmi"/>:<span role="status">Rasm yuklanmoqda…</span>;
+ }
+ 
+ let mapsPromise:Promise<any>|undefined;
+--- a/miniapp/src/style.css
++++ b/miniapp/src/style.css
+@@ -52,3 +52,29 @@
+ .search-filters option:disabled{color:#8a948c;background:#f0f2f0}
+ 
+ .amenities-picker{margin-top:26px}.amenities-picker legend{font-size:16px;font-weight:700}.amenities-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}.amenities-grid label{flex-direction:row;align-items:center;margin:0;padding:12px;border:1px solid var(--line);border-radius:10px;cursor:pointer}.amenities-grid input{width:18px;height:18px;flex-shrink:0;accent-color:var(--green)}textarea{box-sizing:border-box;width:100%;border:1px solid #dce3d7;border-radius:10px;padding:13px;background:#fafbf7;color:var(--green);font:inherit;resize:vertical}.venue-amenities{margin-top:24px}.venue-amenities ul{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0}.venue-amenities li{padding:9px 12px;border-radius:10px;background:#edf3e5;font-size:12px}.extra-amenities{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.7}
++
++/* Customer discovery: sport first, then time, then results. */
++.welcome.welcome-compact{min-height:0;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:24px 28px;margin-bottom:16px;border-radius:20px}
++.welcome-compact .welcome-copy{padding:0}.welcome-compact .welcome-copy:before{display:none}.welcome-compact h1{font-size:30px;letter-spacing:-1px;margin:8px 0 0}.welcome-icon{color:var(--lime);flex-shrink:0}
++.chips{flex-wrap:wrap;overflow:visible;padding:0;gap:8px}.chips button{min-height:44px;padding:10px 14px}
++.search-filters{margin:12px 0 0;padding:16px;background:white}.search-filters h3{font-size:20px;margin-bottom:12px}.search-filters .discovery-toolbar{margin-bottom:12px}.search-filters .search-box input{height:44px}.search-filters .map-toggle{min-width:44px;padding:0 12px}.quick-times{gap:6px;margin-bottom:12px}.quick-times button{font-size:12px;padding:8px 10px}
++.search-filter-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.search-filter-controls .nearby-filter{grid-column:auto;width:auto}.search-filter-controls>button:not(.nearby-filter){grid-column:auto;min-height:44px;justify-self:stretch;white-space:normal}.search-filter-controls>button{display:flex;align-items:center;justify-content:center;gap:6px}.search-filters select{padding-right:32px}
++.search-filters p{font-size:12px;margin-top:10px}.search-filters~.section-heading{margin:20px 0 12px}.search-filters~.section-heading .eyebrow{display:none}.search-filters~.section-heading h2{font-size:22px}
++.venue-image{height:auto;aspect-ratio:16/9}.venue-image>.pitch-art,.venue-image>.sport-placeholder{height:100%;min-height:0}.sport-placeholder{display:grid;place-items:center;background:#eaf0e4;min-height:240px}.sport-placeholder img{width:76px;height:76px;opacity:.7}.venue-content h3{white-space:normal;overflow-wrap:anywhere;line-height:1.4}.venue-content .venue-address{white-space:normal;align-items:flex-start;line-height:1.6;margin:8px 0;color:#526858}.venue-address span{overflow-wrap:anywhere}.venue-address svg{margin-top:3px}.venue-content .venue-distance{min-height:0;margin:8px 0 12px}.venue-content .venue-slot{white-space:normal;color:var(--green);font-weight:700}.venue-footer{flex-wrap:wrap;gap:10px}.venue-footer .card-book{font-size:12px;min-height:44px;padding:10px 12px}.venue-footer span{font-size:12px}.venue-footer>div{white-space:normal}.detail-heading h1,.detail-heading p{overflow-wrap:anywhere}.booking-explanation{font-size:12px;line-height:1.7;color:#526858;margin:16px 0}.time-grid button{min-height:44px}.day-strip button{min-height:64px}.back,.profile-button,.notice button,.search-box button{min-height:44px;min-width:44px}.search-box:focus-within{outline:3px solid #548333;outline-offset:2px}.search-box input:focus-visible{outline:0}.bottom-nav button{min-height:44px}.app{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
++@media(max-width:600px){.site-header{height:68px;margin-bottom:14px}.welcome.welcome-compact{padding:18px;margin-bottom:12px}.welcome-compact h1{font-size:25px;letter-spacing:-.8px}.welcome-compact .eyebrow{font-size:9px}.welcome-icon svg{width:38px;height:38px}.chips{gap:6px}.chips button{font-size:12px;padding:8px 10px}.chips .sport-icon,.sport-icon img{width:18px;height:18px;font-size:18px}.search-filters{padding:12px}.search-filters h3{font-size:19px}.search-filter-controls{gap:8px}.search-filter-controls label{font-size:12px}.search-filter-controls input{padding:0 8px}.search-filters~.section-heading h2{font-size:20px}.count{font-size:11px}.venue-content{padding:16px}.discovery-summary{padding:12px;margin-bottom:12px}.booking-panel{padding:18px}.day-strip{grid-template-columns:repeat(4,minmax(0,1fr))}.day-strip small{font-size:11px}.day-strip strong{font-size:18px}.timezone-tag{white-space:normal;font-size:10px}.date-select{flex-wrap:wrap}.booking-summary{font-size:14px}}
++@media(min-width:901px){.app{padding-bottom:30px}}
++@media(max-width:600px){.site-header{height:auto;min-height:68px;flex-wrap:wrap;gap:12px;padding:12px 0}.header-right{flex-wrap:wrap;min-width:0}.welcome-compact .welcome-copy{min-width:0;overflow-wrap:anywhere}.search-filters~.section-heading{flex-wrap:wrap}.venue-grid .skeleton{height:380px}}
++@media(max-width:600px){.search-filter-controls{grid-template-columns:repeat(auto-fit,minmax(min(100%,9em),1fr))}.search-filter-controls>button{overflow-wrap:anywhere;height:auto}.search-filter-controls input,.search-filter-controls select{height:auto;min-height:44px}.bottom-nav button{min-width:0;overflow-wrap:anywhere}.bottom-nav button span{max-width:100%}}
++
++/* AA text contrast, accessible focus and owner action hierarchy. */
++:root{--muted:#526458}.eyebrow{color:#526458}.owner-banner p{color:#526148}.bottom-nav button{color:#526458}.bottom-nav button.on{color:var(--lime)}.status-pending{color:#705315}.status-approved,.status-confirmed{color:#3e5924}.status-rejected,.status-cancelled{color:#88443a}.search-box input::placeholder,input::placeholder{color:#657462;opacity:1}
++.skip-link{position:fixed;top:8px;left:12px;z-index:100;background:var(--green);color:white;padding:14px;border-radius:10px;transform:translateY(-160%)}.skip-link:focus{transform:translateY(0)}main:focus{outline:none}.venue-card:disabled{opacity:1;cursor:progress}.venue-grid[aria-busy=true]{opacity:.75}.venue-slot{min-height:20px}.search-filter-controls>button{min-height:44px}.secondary{min-height:44px;min-width:44px}.discovery-summary button{min-height:44px}.detail-facts>a{min-height:58px}.bottom-nav{padding-bottom:max(6px,env(safe-area-inset-bottom))}
++.owner-metric{padding:20px;text-align:left;background:#fff;border:1px solid #dde4da;border-radius:14px;min-width:0;overflow-wrap:anywhere}.owner-metric:hover{background:#eef4e5}.owner-metric span,.owner-metric small{display:block;font-size:12px;color:var(--muted)}.owner-metric strong{display:block;font-size:28px;margin:9px 0}.owner-quick-actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 10px}.owner-quick-actions button{min-height:44px;padding:12px 18px;border:1px solid #c4d3bf;border-radius:10px;background:#fff}.owner-quick-actions button[aria-pressed=true]{background:var(--green);color:#fff}.schedule-legend{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.schedule-legend span{padding:7px 10px;background:#eef3e8;border:1px solid #d3dfcd;border-radius:8px;font-size:12px;color:#354b32}.owner-slot-editor{scroll-margin:20px}.owner-workspace button{min-height:44px}.owner-workspace .owner-slot:disabled{color:#586252;opacity:1}.owner-workspace .analytics-metrics>button:focus-visible{outline:3px solid #538331;outline-offset:3px}
++@media(max-width:600px){.owner-tabs{flex-wrap:wrap;overflow:visible}.owner-workspace .owner-toolbar{align-items:center}.owner-workspace .owner-toolbar label{flex:1 1 140px}.owner-workspace .owner-toolbar input,.owner-workspace .owner-toolbar select{min-height:44px}}
++@media(max-width:600px) and (max-height:500px){.bottom-nav{position:static;transform:none;width:100%;max-width:100%;margin-top:16px}.app{padding-bottom:24px}}
++@media(max-width:900px){.app{padding-bottom:calc(var(--nav-height,80px) + 35px + env(safe-area-inset-bottom))}html{scroll-padding-bottom:calc(var(--nav-height,80px) + 24px)}.bottom-nav button{overflow-wrap:anywhere}.bottom-nav button span{max-width:100%}}.photo-unavailable{display:grid;place-items:center;min-height:160px;background:#eaf0e4;color:#526458;width:100%}
++.discovery-summary p{min-height:3.4em;display:flex;align-items:center}
++
++.photos:focus-visible{outline:3px solid #538331;outline-offset:3px}
++
++@media(min-width:901px){.bottom-nav button.on{color:var(--green)}}
+--- /dev/null
++++ b/miniapp/tests/design-check.mjs
+@@ -0,0 +1,81 @@
++/** Repeatable UI acceptance checks. Run npm run test:design (uses local Chrome, or Playwright Chromium). */
++import assert from 'node:assert/strict';
++import {mkdir, writeFile, access} from 'node:fs/promises';
++import {spawn} from 'node:child_process';
++import {createRequire} from 'node:module';
++import {chromium} from 'playwright';
++const require=createRequire(import.meta.url);
++const output=new URL('../../artifacts/design/',import.meta.url);
++await mkdir(output,{recursive:true});
++const port=5187;
++const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port',String(port)],{cwd:new URL('..',new URL('.',import.meta.url)),env:{...process.env,VITE_API_URL:'http://127.0.0.1:8009'},stdio:'ignore'});
++let browser;
++try {
++ for(let i=0;i<80;i++){try{if((await fetch(`http://127.0.0.1:${port}`)).ok)break}catch{}await new Promise(r=>setTimeout(r,100));}
++ const macChrome='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
++ const executablePath=process.env.CHROME_PATH || await access(macChrome).then(()=>macChrome).catch(()=>undefined);
++ browser=await chromium.launch({executablePath,headless:true});
++ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,timezoneId:'Asia/Tashkent'});
++ const page=await context.newPage();
++ await page.route('https://fonts.googleapis.com/**',r=>r.abort());
++ await page.route('https://telegram.org/**',r=>r.abort());
++ const tomorrow=new Date(Date.now()+86400000).toLocaleDateString('en-CA',{timeZone:'Asia/Tashkent'});
++ const start=`${tomorrow}T20:00:00+05:00`;
++ let mode='normal',contact=false,searchCount=0,bookingCount=0;
++ const venue={id:1,name:'Namangan sport maydoni',sport:'football',address:'Namangan, Davlatobod tumani',price:150000,photos:[],latitude:41,longitude:71,hours:'08:00–23:00',status:'approved',suspended:false};
++ let ownerBookings=[];
++ await page.addInitScript(()=>{window.Telegram={WebApp:{ready(){},expand(){},get initData(){return sessionStorage.getItem('test-auth')||''},requestContact(callback){window.dispatchEvent(new Event('test-contact'));callback(true)}}}});
++ await page.route('http://127.0.0.1:8009/**',async route=>{
++  const url=new URL(route.request().url()),path=url.pathname;
++  const json=data=>route.fulfill({json:data});
++  if(path==='/auth/config')return json({bot_username:'maydon_test_bot'});
++  if(path==='/auth/me')return json({id:101,first_name:'Test egasi',admin:false});
++  if(path==='/auth/contact')return json({phone:contact?'+998900000001':null});
++  if(path==='/owner/venues')return json([venue]);
++  if(path==='/owner/overview')return json({today:1,pending:1,value:150000,unpaid:1});
++  if(path==='/owner/bookings')return json([{id:10,venue_name:venue.name,start_at:start,status:'pending',source:'telegram',customer_name:'Test',customer_phone:null,payment_status:'unpaid',booked_price:150000}]);
++  if(path==='/owner/schedule')return json({hours:'08:00–23:00',slots:[{start_at:start,status:'available',booking:null,block:null}]});
++  if(path==='/owner/manual-bookings'||path==='/owner/blocks'){ownerBookings.push({path,body:route.request().postDataJSON()});return json({id:11})}
++  if(path==='/bookings'&&route.request().method()==='POST'){bookingCount++;if(mode==='conflict')return route.fulfill({status:409,json:{detail:'Conflict'}});return json({id:42,status:'pending'})}
++  if(path==='/bookings/me')return json([{id:42,venue_name:venue.name,start_at:start,status:'pending'}]);
++  if(path.startsWith('/photos/'))return mode==='photo-error'?route.fulfill({status:500,body:''}):route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect width="960" height="540" fill="#204f36"/></svg>'});
++  if(path.includes('/availability')){if(mode==='slot-error')return route.fulfill({status:500,json:{}});return json({hours:'08:00–23:00',slots:[{start_at:start,label:'20:00',status:mode==='conflict'?'booked':'available'}]})}
++  if(path==='/venues'){
++   if(mode==='error')return route.fulfill({status:500,json:{}});
++   if(url.searchParams.has('available_at')){searchCount++;if(mode==='slow-search')await new Promise(r=>setTimeout(r,700));if(mode==='search-error')return route.fulfill({status:500,json:{}})}
++   if(mode==='slow')await new Promise(r=>setTimeout(r,700));
++   return json(mode==='empty'?[]:[mode==='gallery'?{...venue,photos:[1,2]}:mode==='photo-error'?{...venue,photos:[1]}:mode==='long'?{...venue,name:'Uzun nomli sport majmuasi '.repeat(5),address:'Juda uzun manzil '.repeat(12),sport:'table_tennis'}:venue]);
++  }
++  return json({});
++ });
++ const results=[];
++ async function home(query=''){await page.goto(`http://127.0.0.1:${port}/${query}`,{waitUntil:'domcontentloaded'});}
++ async function noOverflow(){assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal overflow')}
++ async function shot(name){await page.screenshot({path:new URL(name+'.png',output).pathname,fullPage:true})}
++ async function audit(name){await page.addScriptTag({path:require.resolve('axe-core/axe.min.js')});const result=await page.evaluate(()=>window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}));results.push({name,violations:result.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))});}
++ for(const width of [360,390,430,768,1280]){
++  await page.setViewportSize({width,height:844});await home();await page.locator('.venue-card').waitFor();await noOverflow();const firstCardTop=await page.locator('.venue-card').evaluate(e=>e.getBoundingClientRect().top);if(width===390)assert(firstCardTop<768,'first card must start above mobile navigation');await shot(`after-${width}`);results.push({width,firstCardTop,overflow:false});
++ }
++ await audit('home-desktop');await page.setViewportSize({width:390,height:844});await audit('home');
++ // Real keyboard focus and named controls, with programmatic pressed states for screen readers.
++ await page.keyboard.press('Tab');assert(await page.locator(':focus').count());
++ assert(await page.getByRole('button',{name:'Barchasi',exact:true}).getAttribute('aria-pressed')==='true');
++ for(const button of await page.locator('.chips button,.quick-times button,.map-toggle,.nearby-filter,.profile-button,.bottom-nav button').all()){const box=await button.boundingBox();assert(box.width>=44&&box.height>=44,`small touch target: ${await button.innerText()}`)}
++ // Refresh retains card position; old availability is not presented as confirmed.
++ mode='slow-search';await page.getByRole('button',{name:'Ertaga 20:00',exact:true}).click();await page.locator('.venue-card:not(:disabled)').waitFor();const before=await page.locator('.venue-card').evaluate(e=>e.getBoundingClientRect().top+scrollY);await page.getByRole('button',{name:'Yangilash',exact:true}).click();await page.locator('.venue-card:disabled').waitFor();assert.match(await page.locator('.venue-slot').innerText(),/Tekshirilmoqda/);const during=await page.locator('.venue-card').evaluate(e=>e.getBoundingClientRect().top+scrollY);assert(Math.abs(during-before)<1,`refresh layout shift: ${before} → ${during}`);await page.locator('.venue-card:not(:disabled)').waitFor();mode='normal';
++ await page.locator('.venue-card').click();await page.locator('.booking-summary').waitFor();assert.match(await page.locator('.booking-summary').innerText(),/20:00–21:00/);assert.match(await page.getByRole('link',{name:'Telegramda bron qilish'}).getAttribute('href'),/start=book_1_\d+/);await audit('booking-login');await shot('detail-390');
++ // Return from bot carries venue and selected slot.
++ await home(`?venue=1&slot=${Date.parse(start)/1000}`);await page.locator('.booking-summary').waitFor();assert.match(await page.locator('.booking-summary').innerText(),/20:00/);
++ // Signed Telegram UI test double, including contact and actual request payload.
++ await page.evaluate(()=>sessionStorage.setItem('test-auth','test-only'));await home(`?venue=1&slot=${Date.parse(start)/1000}`);await page.locator('.booking-contact').waitFor();await page.locator('.booking-summary').waitFor();assert.match(await page.getByRole('link',{name:'Bot orqali ulashish'}).getAttribute('href'),/start=phone_1_\d+/);await page.getByRole('button',{name:'Telefon raqamimni ulashish'}).click();contact=true;await page.getByRole('button',{name:'Bron soʻrovi yuborish',exact:true}).waitFor();await audit('booking-contact');await page.getByRole('button',{name:'Bron soʻrovi yuborish',exact:true}).click();await page.getByRole('heading',{name:venue.name,exact:true}).waitFor();assert.equal(bookingCount,1);await audit('pending-booking');
++ // A 409 invalidates the selection and reloads the calendar.
++ await home(`?venue=1&slot=${Date.parse(start)/1000}`);await page.locator('.booking-summary').waitFor();mode='conflict';await page.getByRole('button',{name:'Bron soʻrovi yuborish',exact:true}).click();await page.getByText('Bu vaqt hozirgina band qilindi.',{exact:false}).waitFor();await page.locator('.time-grid button.booked').waitFor();assert.equal(await page.locator('.booking-summary').count(),0);await audit('booking-conflict');
++ for(const state of ['empty','error','long','slow','search-error','photo-error']){mode=state;await home(state==='search-error'?`?day=${tomorrow}&time=20:00`:'');if(state==='slow'){await page.getByRole('status',{name:'Yuklanmoqda',exact:true}).waitFor();await shot('loading-390');await page.locator('.venue-card').waitFor()}else if(state==='empty')await page.getByRole('heading',{name:'Birinchi maydonni kutyapmiz'}).waitFor();else if(state==='error')await page.getByRole('heading',{name:'Maydonlar yuklanmadi'}).waitFor();else if(state==='search-error')await page.getByRole('heading',{name:'Vaqtlarni tekshirib boʻlmadi'}).waitFor();else if(state==='photo-error')await page.getByText('Rasm mavjud emas',{exact:true}).waitFor();else await page.locator('.sport-placeholder').waitFor();await noOverflow();await audit(state);await shot(`${state}-390`)}
++ mode='gallery';await home('?venue=1');await page.locator('.detail-gallery img').nth(1).waitFor();await page.getByRole('group',{name:'Maydon rasmlari — yon tomonga suring'}).focus();await audit('gallery-scroll');await shot('gallery-390');mode='normal';await home();await page.locator('.venue-card').waitFor();await page.addStyleTag({content:'html{font-size:200%} button,input,select,p,h1,h2,h3,span,label{font-size:1rem!important}'});await noOverflow();await shot('text-large-390');
++ await home('?owner=1');await page.getByRole('heading',{name:'Boshqaruv paneli'}).waitFor();await page.locator('.owner-slot').waitFor();await audit('owner-schedule');await shot('owner-390');await page.getByRole('button',{name:/Yangi soʻrovlar/}).click();await page.getByRole('button',{name:'Tasdiqlash',exact:true}).waitFor();assert.equal(await page.locator('select[name=status]').inputValue(),'pending');await audit('owner-pending');await shot('owner-pending-390');
++ await page.getByRole('button',{name:'Jadval',exact:true}).click();await page.getByRole('button',{name:'Vaqtni yopish',exact:true}).click();await page.locator('.owner-slot').click();assert.equal(await page.locator('.owner-slot-editor select').inputValue(),'block');await page.locator('.owner-slot-editor input[name=reason]').fill('Test yopish');await audit('owner-block-editor');await shot('owner-block-390');await page.locator('.owner-slot-editor .primary').click();await page.getByText('Vaqt yopildi.',{exact:true}).waitFor();assert.equal(ownerBookings.at(-1).path,'/owner/blocks');
++ await page.getByRole('button',{name:'+ Qoʻlda bron',exact:true}).click();await page.locator('.owner-slot').click();await page.locator('input[name=customer_name]').fill('Sinov mijoz');await page.locator('input[name=customer_phone]').fill('+998900000001');await audit('owner-manual-editor');await page.locator('.owner-slot-editor .primary').click();await page.getByText('Bron saqlandi.',{exact:true}).waitFor();assert.equal(ownerBookings.at(-1).path,'/owner/manual-bookings');
++ await page.setViewportSize({width:360,height:844});await noOverflow();await shot('owner-360');await page.setViewportSize({width:1280,height:900});await shot('owner-1280');await noOverflow();await home();await page.locator('.venue-card').waitFor();await page.setViewportSize({width:390,height:360});await page.getByRole('textbox',{name:'Maydon qidirish'}).focus();await noOverflow();assert.equal(await page.locator('.bottom-nav').evaluate(e=>getComputedStyle(e).position),'static');await shot('keyboard-short-viewport');
++ await writeFile(new URL('check-results.json',output),JSON.stringify({checkedAt:new Date().toISOString(),environment:'Local Vite + controlled API/Telegram test doubles; not a real Telegram device',checks:['all viewports','44px primary targets','keyboard focus','no horizontal overflow at enlarged text','refresh position stable and no stale available label','bot return venue and slot','contact sharing','pending booking','409 invalidation','owner pending shortcut','manual booking and blocking'],results},null,2));
++ const violations=results.filter(r=>r.violations?.length);assert.deepEqual(violations,[],'WCAG audit failures: '+JSON.stringify(violations));console.log(`PASS: design acceptance, ${results.length} checks/audits`);
++} finally {await browser?.close();server.kill('SIGTERM');}
+--- /dev/null
++++ b/miniapp/tests/discovery.test.mjs
+@@ -0,0 +1,44 @@
++import assert from 'node:assert/strict';
++import {readFile} from 'node:fs/promises';
++import {test} from 'node:test';
++import ts from 'typescript';
++
++const source = await readFile(new URL('../src/discovery.ts', import.meta.url), 'utf8');
++const {outputText} = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.ESNext}});
++const {validDiscoveryTime, readDiscovery, discoveryLink} = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
++const now = Date.parse('2026-11-15T12:00:00Z'); // 17:00 in Uzbekistan
++
++test('Uzbekistan time is independent of the device timezone', () => {
++  assert.equal(validDiscoveryTime('2026-11-15', '18:00', now), true);
++  assert.equal(validDiscoveryTime('2026-11-15', '17:00', now), false);
++  assert.equal(validDiscoveryTime('2026-11-16', '00:00', now), true);
++});
++
++test('invalid dates, non-hour slots and expired times are rejected', () => {
++  for (const [day, time] of [['2026-02-30', '18:00'], ['2026-11-31', '18:00'], ['2026-11-16', '24:00'], ['2026-11-16', '18:30'], ['2026-11-16', '8:00'], ['', '18:00'], ['2026-11-14', '20:00']]) {
++    assert.equal(validDiscoveryTime(day, time, now), false, `${day} ${time}`);
++  }
++  assert.equal(validDiscoveryTime('2026-11-15', '18:00', Date.parse('2026-11-15T12:55:00Z')), false);
++  assert.equal(validDiscoveryTime('2026-11-15', '18:00', Date.parse('2026-11-15T12:54:59Z')), true);
++  assert.equal(validDiscoveryTime('2027-01-14', '17:00', now), true);
++  assert.equal(validDiscoveryTime('2027-01-14', '18:00', now), false);
++});
++
++test('only supported sports and a valid future time are restored', () => {
++  for (const sport of ['all', 'football', 'table_tennis', 'billiards']) {
++    assert.deepEqual(readDiscovery(`?sport=${sport}&q=Namangan&day=2026-11-15&time=18%3A00`, now), {sport, query: 'Namangan', day: '2026-11-15', time: '18:00'});
++  }
++  assert.deepEqual(readDiscovery('?sport=unknown&day=2026-11-14&time=20:00', now), {sport: 'all', query: '', day: '', time: ''});
++  assert.equal(readDiscovery(`?q=${'a'.repeat(120)}`, now).query.length, 100);
++});
++
++test('shared URLs contain only the intended discovery filters', () => {
++  const href = 'https://maydon.example/?phone=998901234567&latitude=41&longitude=71&tgWebAppData=secret&owner=1&venue=42#tgWebAppData=secret';
++  const state = {sport: 'football', query: '  Markaz & stadion  ', day: '2026-11-15', time: '18:00'};
++  const url = new URL(discoveryLink(href, state, now));
++  assert.deepEqual([...url.searchParams.keys()], ['sport', 'q', 'day', 'time']);
++  assert.equal(url.hash, '');
++  assert.deepEqual(readDiscovery(url.search, now), {...state, query: state.query.trim()});
++  const expired = new URL(discoveryLink(href, {...state, sport: 'invalid', day: '2026-11-14'}, now));
++  assert.deepEqual([...expired.searchParams.keys()], ['q']);
++});
+--- /dev/null
++++ b/miniapp/tests/live-design-check.mjs
+@@ -0,0 +1,25 @@
++/** Read-only public production check. Never creates a booking or uses signed user data. */
++import assert from 'node:assert/strict';
++import {access,mkdir,writeFile} from 'node:fs/promises';
++import {createRequire} from 'node:module';
++import {chromium} from 'playwright';
++const require=createRequire(import.meta.url);
++const web=process.env.DESIGN_WEB_URL||'https://maydon-web-production-3612.up.railway.app';
++const api=process.env.DESIGN_API_URL||'https://maydon-production-ba2c.up.railway.app';
++const output=new URL('../../artifacts/design/',import.meta.url);await mkdir(output,{recursive:true});
++const mac='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
++const executablePath=process.env.CHROME_PATH||await access(mac).then(()=>mac).catch(()=>undefined);
++const browser=await chromium.launch({headless:true,executablePath});
++try {
++ const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,timezoneId:'Asia/Tashkent'});
++ const failures=[];page.on('pageerror',e=>failures.push(e.message));
++ const report={checkedAt:new Date().toISOString(),web,environment:'Public production, real API/photos; no authenticated or mutating calls',checks:[],accessibility:[]};
++ const venues=await (await fetch(api+'/venues')).json();
++ for(const width of [360,390,430,768,1280]){await page.setViewportSize({width,height:844});await page.goto(web,{waitUntil:'domcontentloaded'});await page.locator('.welcome-compact').waitFor();if(venues.length)await page.locator('.venue-card').first().waitFor();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:new URL(`live-${width}.png`,output).pathname,fullPage:true});report.checks.push({width,overflow:false})}
++ async function audit(name){await page.addScriptTag({path:require.resolve('axe-core/axe.min.js')});const {violations}=await page.evaluate(()=>window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}));report.accessibility.push({name,violations:violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))});}
++ await audit('home-desktop');await page.setViewportSize({width:390,height:844});await audit('home');
++ if(venues.length){const venue=venues.find(v=>v.photos?.length)||venues[0];await page.goto(`${web}/?venue=${venue.id}`,{waitUntil:'domcontentloaded'});await page.locator('.booking-picker').waitFor();await page.locator('.time-grid,.booking-picker [role=alert]').first().waitFor();if(venue.photos?.length){await page.locator('.detail-gallery img').first().waitFor();assert(await page.locator('.detail-gallery img').first().evaluate(img=>img.complete&&img.naturalWidth>0));report.checks.push('real production photo loaded')}
++ const available=page.locator('.time-grid button:not(:disabled)');if(await available.count()){await available.first().click();await page.locator('.booking-summary').waitFor();const link=page.getByRole('link',{name:'Telegramda bron qilish'});await link.waitFor();assert.match(await link.getAttribute('href'),new RegExp(`start=book_${venue.id}_\\d+`));report.checks.push('production availability, summary and Telegram venue/slot link')}
++ await audit('detail');await page.screenshot({path:new URL('live-detail-390.png',output).pathname,fullPage:true});}
++ assert.deepEqual(failures,[]);await writeFile(new URL('live-results.json',output),JSON.stringify(report,null,2));assert.deepEqual(report.accessibility.filter(a=>a.violations.length),[],'Production accessibility failures: '+JSON.stringify(report.accessibility));console.log('PASS: production design, real photos/availability, Telegram return link and WCAG audits');
++} finally {await browser.close()}
+--- a/.github/workflows/validate.yml
++++ b/.github/workflows/validate.yml
+@@ -51,4 +51,13 @@
+           cache: npm
+           cache-dependency-path: miniapp/package-lock.json
+       - run: npm ci
++      - run: npm test
+       - run: npm run build
++      - run: npx playwright install --with-deps chromium
++      - run: npm run test:design
++      - uses: actions/upload-artifact@v4
++        if: always()
++        with:
++          name: design-checks
++          path: artifacts/design/
++      - run: npm run test:product
+--- a/scripts/check_live.py
++++ b/scripts/check_live.py
+@@ -13,7 +13,7 @@
+         return response.read().decode('utf-8')
+ 
+ 
+-def check(api, web):
++def check(api, web, design=False):
+     if json.loads(fetch(api + '/health')) != {'status': 'ok'}:
+         raise ValueError('API is not healthy')
+     print('PASS: API and database health')
+@@ -42,15 +42,20 @@
+     if not all(value in bundle for value in (api, '/owner/schedule', '/owner/manual-bookings', '/admin/attention', '/admin/people', '/admin/activity')):
+         raise ValueError('Frontend owner/admin features or API origin do not match')
+     print('PASS: frontend assets, owner/admin features and API origin')
++    if design:
++        if not all(value in bundle for value in ('welcome-compact', 'booking-explanation', 'owner-quick-actions', 'main-content')):
++            raise ValueError('Frontend design release is missing')
++        print('PASS: compact discovery, booking summary, owner actions and keyboard navigation')
+ 
+ 
+ if __name__ == '__main__':
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument('--api', default='https://maydon-production-ba2c.up.railway.app')
+     parser.add_argument('--web', default='https://maydon-web-production-3612.up.railway.app')
++    parser.add_argument('--design', action='store_true', help='Also require the November design release')
+     args = parser.parse_args()
+     try:
+-        check(args.api.rstrip('/'), args.web.rstrip('/'))
++        check(args.api.rstrip('/'), args.web.rstrip('/'), args.design)
+     except (HTTPError, URLError, TimeoutError, ValueError, KeyError):
+         # Avoid printing response bodies or connection details into deployment logs.
+         print('FAIL: deployment check failed; inspect service health, authentication and assets.', file=sys.stderr)
