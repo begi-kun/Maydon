@@ -68,6 +68,14 @@ class AuthTests(unittest.TestCase):
         for value in ['not base64', base64.b64encode(b'<svg/>').decode()]:
             with self.assertRaises(main.HTTPException): main.prepare_photo(value)
 
+    def test_amenities_validation_and_legacy_default(self):
+        self.assertEqual(main.VenueIn(**payload()).amenities, [])
+        venue = main.VenueIn(**{**payload(), 'amenities': ['shower', 'lighting', 'shower'], 'extra_amenities': 'Sauna'})
+        self.assertEqual(venue.amenities, ['shower', 'lighting'])
+        self.assertEqual(venue.extra_amenities, 'Sauna')
+        for invalid in [{'amenities': ['unknown']}, {'extra_amenities': 'a' * 501}]:
+            self.assertEqual(self.client.post('/venues', headers=headers(), json={**payload(), **invalid}).status_code, 422)
+
     def test_missing_photos_and_large_body(self):
         data = payload(); data['photos'] = []
         self.assertEqual(self.client.post('/venues', headers=headers(), json=data).status_code, 422)
@@ -138,12 +146,14 @@ class OwnerIntegrationTests(unittest.TestCase):
         venue_id = self.client.post('/venues', headers=headers(401), json=payload()).json()['id']
         self.client.post(f'/admin/venues/{venue_id}/approved', headers=headers(999))
         venue = next(v for v in self.client.get('/owner/venues', headers=headers(401)).json() if v['id'] == venue_id)
-        change = {**payload(), 'name': 'Updated pitch', 'photos': [], 'keep_photos': venue['photos']}
+        change = {**payload(), 'name': 'Updated pitch', 'amenities': ['shower', 'lighting'], 'extra_amenities': 'Sauna', 'photos': [], 'keep_photos': venue['photos']}
         endpoint = f'/owner/venues/{venue_id}/edit'
         self.assertEqual(self.client.post(endpoint, headers=headers(402), json=change).status_code, 404)
         self.assertEqual(self.client.post(endpoint, headers=headers(401), json={**change, 'keep_photos': [999999]}).status_code, 422)
         self.assertEqual(self.client.post(endpoint, headers=headers(401), json=change).status_code, 200)
         updated = next(v for v in self.client.get('/owner/venues', headers=headers(401)).json() if v['id'] == venue_id)
+        self.assertEqual(updated['amenities'], ['shower', 'lighting'])
+        self.assertEqual(updated['extra_amenities'], 'Sauna')
         self.assertEqual(updated['name'], 'Updated pitch')
         self.assertEqual(updated['status'], 'pending')
         self.assertEqual(updated['photos'], venue['photos'])

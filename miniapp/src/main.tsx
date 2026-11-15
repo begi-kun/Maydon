@@ -1,3 +1,4 @@
+import {VenueAmenities} from './owner';
 import React, {useEffect, useMemo, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {House, Search, MapPin, UserRound, CalendarDays, ArrowUpRight, ArrowLeft, ArrowRight, Clock3, Phone, ShieldCheck, Plus, RefreshCw, X, Check, Compass, Goal, SlidersHorizontal, Send} from 'lucide-react';
@@ -8,7 +9,7 @@ import {sportMarkerOptions} from './sport-markers';
 import {BookingPicker, localDate} from './booking';
 import {PhotoGallery, directions, loadMaps, API, authHeaders} from './owner';
 
-type Venue={photos?:number[];id:number;name:string;sport:string;address:string;latitude:number;longitude:number;price:number;phone:string;hours:string;status?:string;suspended?:boolean;review_reason?:string;owner_telegram_id?:number};
+type Venue={amenities?:string[];extra_amenities?:string;photos?:number[];id:number;name:string;sport:string;address:string;latitude:number;longitude:number;price:number;phone:string;hours:string;status?:string;suspended?:boolean;review_reason?:string;owner_telegram_id?:number};
 type Booking={customer_phone?:string|null;id:number;venue_name:string;start_at:string;status:string};
 type Tab='home'|'explore'|'map'|'bookings'|'profile'|'owner'|'admin';
 const sports=[['all','Barchasi'],['football','Futbol'],['table_tennis','Stol tennisi'],['billiards','Bilyard']];
@@ -82,7 +83,7 @@ function App(){
   <main>
   {selected?<>
    <button className="back" onClick={()=>{setSelected(null)}}><ArrowLeft size={17}/> Maydonlarga qaytish</button>
-   <div className="detail-layout"><div><div className="detail-gallery">{selected.photos?.length?<PhotoGallery ids={selected.photos}/>:<PitchArt/>}</div><div className="detail-heading"><span className="eyebrow">{sportName(selected.sport)}</span><h1>{selected.name}</h1><p><MapPin size={16}/>{selected.address.startsWith('Xaritadagi joy:')?'Joylashuv xaritada belgilangan':selected.address}</p></div><div className="detail-facts"><div><Clock3/><span>Ish vaqti<strong>{selected.hours||'Egasi bilan aniqlashtiring'}</strong></span></div><a href={directions(selected.latitude,selected.longitude)} target="_blank" rel="noreferrer"><MapPin/><span>Manzilga borish<strong>Yoʻnalishni ochish ↗</strong></span></a>{selected.phone&&<a href={`tel:${selected.phone}`}><Phone/><span>Maydon egasi<strong>{selected.phone}</strong></span></a>}</div></div>
+   <div className="detail-layout"><div><div className="detail-gallery">{selected.photos?.length?<PhotoGallery ids={selected.photos}/>:<PitchArt/>}</div><div className="detail-heading"><span className="eyebrow">{sportName(selected.sport)}</span><h1>{selected.name}</h1><p><MapPin size={16}/>{selected.address.startsWith('Xaritadagi joy:')?'Joylashuv xaritada belgilangan':selected.address}</p></div><div className="detail-facts"><div><Clock3/><span>Ish vaqti<strong>{selected.hours||'Egasi bilan aniqlashtiring'}</strong></span></div><a href={directions(selected.latitude,selected.longitude)} target="_blank" rel="noreferrer"><MapPin/><span>Manzilga borish<strong>Yoʻnalishni ochish ↗</strong></span></a>{selected.phone&&<a href={`tel:${selected.phone}`}><Phone/><span>Maydon egasi<strong>{selected.phone}</strong></span></a>}</div><VenueAmenities amenities={selected.amenities} extra_amenities={selected.extra_amenities}/></div>
    <aside className="booking-panel"><span className="eyebrow">KEYINGI OʻYININGIZ</span><h2>{price(selected.price)} <small>soʻm / soat</small></h2><div className="divider"/><BookingPicker key={selected.id} sport={selected.sport} venueId={selected.id} price={selected.price} authenticated={!!verifiedUser} botUsername={botUsername} busy={bookingBusy} revision={availabilityRevision} initialTime={searchTime||undefined} onBook={book}/></aside></div>
   </>:<>
   {(tab==='home'||tab==='explore')&&<>

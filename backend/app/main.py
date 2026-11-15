@@ -142,7 +142,17 @@ class VenueIn(BaseModel):
     price: int = Field(ge=0, le=100000000)
     phone: str = Field(default='', max_length=40)
     hours: str = Field(default='', max_length=120)
+    amenities: list[str] = Field(default_factory=list, max_length=20)
+    extra_amenities: str = Field(default='', max_length=500)
     photos: list[str] = Field(min_length=1, max_length=5)
+
+    @field_validator('amenities')
+    @classmethod
+    def validate_amenities(cls, values):
+        allowed = {'changing_room', 'shower', 'stands', 'lighting', 'parking', 'toilet', 'drinking_water', 'equipment_rental', 'wifi', 'cafe', 'covered_field', 'lockers'}
+        if any(value not in allowed for value in values):
+            raise ValueError('Unknown amenity')
+        return list(dict.fromkeys(values))
 
     @field_validator('hours')
     @classmethod
@@ -209,6 +219,8 @@ CREATE TABLE IF NOT EXISTS venue_photos (
  id BIGSERIAL PRIMARY KEY, venue_id BIGINT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
  image BYTEA NOT NULL);
 CREATE INDEX IF NOT EXISTS venue_photos_venue ON venue_photos(venue_id);
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS amenities TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS extra_amenities TEXT NOT NULL DEFAULT '';
 ALTER TABLE venues ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE venues ADD COLUMN IF NOT EXISTS suspended BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE venues ADD COLUMN IF NOT EXISTS review_reason TEXT;
@@ -276,7 +288,7 @@ def health():
 @app.get('/venues')
 def venues(sport: str | None = None, available_at: datetime | None = None):
     start = valid_start(available_at) if available_at is not None else None
-    query = """SELECT id,name,sport,address,latitude,longitude,price,phone,hours,
+    query = """SELECT id,name,sport,address,latitude,longitude,price,phone,hours,amenities,extra_amenities,
         ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos
         FROM venues WHERE deleted_at IS NULL AND NOT suspended AND status=%s"""
     params = ['approved']
@@ -350,7 +362,7 @@ def update_venue(venue_id: int, venue: VenueEdit, user: int):
         if not set(kept).issubset(existing):
             raise HTTPException(422, 'Photo does not belong to this pitch')
         photos = [prepare_photo(photo) for photo in venue.photos]
-        conn.execute("UPDATE venues SET name=%s,sport=%s,address=%s,latitude=%s,longitude=%s,price=%s,phone=%s,hours=%s,status='pending',review_reason=NULL WHERE id=%s", (*venue.model_dump(exclude={'photos', 'keep_photos'}).values(), venue_id))
+        conn.execute("UPDATE venues SET name=%s,sport=%s,address=%s,latitude=%s,longitude=%s,price=%s,phone=%s,hours=%s,amenities=%s,extra_amenities=%s,status='pending',review_reason=NULL WHERE id=%s", (*venue.model_dump(exclude={'photos', 'keep_photos'}).values(), venue_id))
         conn.execute('DELETE FROM venue_photos WHERE venue_id=%s AND NOT (id = ANY(%s::bigint[]))', (venue_id, kept))
         for photo in photos:
             conn.execute('INSERT INTO venue_photos(venue_id,image) VALUES (%s,%s)', (venue_id, photo))
@@ -373,8 +385,8 @@ def delete_venue(venue_id: int, user: int = Depends(authenticate)):
 def save_venue(venue: VenueIn, user: int):
     photos = [prepare_photo(photo) for photo in venue.photos]
     with db() as conn:
-        result = conn.execute('''INSERT INTO venues(name,sport,address,latitude,longitude,price,phone,hours,owner_telegram_id)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''', (*venue.model_dump(exclude={'photos'}).values(),user)).fetchone()
+        result = conn.execute('''INSERT INTO venues(name,sport,address,latitude,longitude,price,phone,hours,amenities,extra_amenities,owner_telegram_id)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''', (*venue.model_dump(exclude={'photos'}).values(),user)).fetchone()
         for photo in photos:
             conn.execute('INSERT INTO venue_photos(venue_id,image) VALUES (%s,%s)', (result['id'], photo))
         if ADMIN_ID:
@@ -729,7 +741,7 @@ def cancel(booking_id: int, user: int = Depends(authenticate)):
 @app.get('/owner/venues')
 def owner_venues(user: int = Depends(authenticate)):
     with db() as conn:
-        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours,status,suspended,review_reason, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE owner_telegram_id=%s AND deleted_at IS NULL ORDER BY id DESC',(user,)).fetchall()
+        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours,amenities,extra_amenities,status,suspended,review_reason, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE owner_telegram_id=%s AND deleted_at IS NULL ORDER BY id DESC',(user,)).fetchall()
 
 @app.get('/admin/status')
 def admin_status(user: int = Depends(authenticate)):
