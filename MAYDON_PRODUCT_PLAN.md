@@ -15,6 +15,8 @@ Ushbu bosqichdagi ishlar:
 
 Tekshiruv: frontend build; URL uchun sport/vaqt validatsiyasi, eskirgan va noto‘g‘ri vaqtlar, UTC+5 va shaxsiy parametrlar olib tashlanishi. Alohida real Telegram va mobil brauzer sinovi relizdan oldin bajariladi.
 
+Mahalliy holat (2026-11-15): birinchi bosqichning mavjud interfeysi tekshirildi. `miniapp/tests/discovery.test.mjs` sport va vaqt validatsiyasi, UTC+5, noto‘g‘ri sanalar, 5 daqiqalik/60 kunlik chegaralar, havola orqali filtrlarni tiklash va begona URL parametrlarini chiqarib tashlashni tekshiradi. `npm test` va frontend build muvaffaqiyatli o‘tdi; testlar CI tekshiruviga ham qo‘shildi. Qidiruv izohida doimiy real vaqt kafolati yo‘qligi va server bron vaqtini yana tekshirishi ochiq yozildi. Real Telegram va mobil brauzer sinovi, kod ko‘rib chiqish va reliz hali bajarilmagan. Deploy qilinmadi.
+
 ## 2. Ikki haftalik kichik pilot
 
 Taklif: 5–10 maydon, bir mas’ul bilan ish boshlash. Egalar jadvalga telefon va kelib olingan bronlarni ham kiritishni o‘rganadi. Egalar bilan bog‘lanish va tashqi xabarlar yuborish ushbu reja bilan bajarilmaydi.
@@ -26,7 +28,7 @@ O‘lchovlar:
 - Bekor qilish va kelmay qolish holatlari.
 - Ikkinchi hafta qayta bron qilgan mijozlar.
 
-Hozir qidiruv hodisalari uchun analitika qo‘shilmadi. Pilot oldidan minimal hodisalar: discovery_results (sana, soat, sport, natija soni), venue_open, booking_request_created. Telefon, GPS, ism va erkin qidiruv matnini hodisalarga qo‘shmaslik. So‘rovlar soni bilan alohida mijozlar sonini aralashtirmaslik. Bazaviy o‘lchovlar olinmaguncha muvaffaqiyat foizi va’da qilinmaydi.
+Mahalliy kodda pilot analitikasi qo‘shildi; real pilot hali boshlanmagan. Minimal hodisalar: discovery_results (sana, soat, sport, natija soni), venue_open, booking_request_created. Telefon, GPS, ism va erkin qidiruv matnini hodisalarga qo‘shmaslik. So‘rovlar soni bilan alohida mijozlar sonini aralashtirmaslik. Bazaviy o‘lchovlar olinmaguncha muvaffaqiyat foizi va’da qilinmaydi.
 
 ## 3. Har hafta shu vaqt — pilotdan keyingi nomzod
 
@@ -45,3 +47,15 @@ Mijoz maydon/soatga obuna bo‘ladi. Bekor qilingan bron yoki ochilgan blokdan k
 ## Reliz talablari
 
 UPDATE_PLAN.md va PRODUCTION_CHECKLIST.md dagi xavfsizlik, monitoring, backup va haqiqiy akkaunt tekshiruvlari saqlanadi. Ushbu reja production tayyorligi haqidagi xulosa emas. Birinchi bosqich mahalliy tekshirilgach, kod ko‘rib chiqish va reliz tartibi bo‘yicha chiqariladi; bu ish avtomatik deployni o‘z ichiga olmaydi.
+
+
+## Amalga oshirish holati — 2026-11-15
+
+- 1-bosqich: mavjud vaqtli qidiruv tekshirildi; URL testlari va CI qo‘shildi.
+- 2-bosqich: maxfiy maydonlarsiz discovery_results/venue_open hodisalari, serverdagi booking_request_created, adminning 14 kunlik pilot hisoboti va egalar uchun seans natijasi qaydi qo‘shildi. Hisobot so‘rov va mijozlar sonini ajratadi; javob vaqti, bekor qilish, jadval xatosi/kelmay qolish va ikkinchi hafta qaytishini ko‘rsatadi. Qayd qilinmagan natijalar noma’lum qoladi.
+- 3-bosqich: egalar uchun 1–4 haftalik takroriy qo‘lda bron, tekshirish/aniq sana tanlash, tranzaksiya, maydon qulfi va qayta so‘rov himoyasi tayyorlandi. `ENABLE_RECURRING_BOOKINGS` odatda o‘chiq; pilotdan keyingi qaror saqlangan.
+- 4-bosqich: band slotga obuna, shaxsiy ro‘yxat/o‘chirish, workerda bo‘sh vaqtni tekshirish va bitta obuna uchun bitta navbat yozuvi tayyorlandi. `ENABLE_AVAILABILITY_ALERTS` API va botda odatda o‘chiq. Xabar joyni rezerv qilmaydi.
+- Pilotni yuritish, o‘lchov ta’riflari, bayroqlar, deploy/rollback va keyingi tajribalar uchun qarorlar [PILOT_RUNBOOK.md](PILOT_RUNBOOK.md) da yozilgan.
+- Haqiqiy ikki haftalik pilot, egalarni jalb qilish, haqiqiy Telegram akkaunti sinovi, to‘lov merchant ulanishi va 5-bo‘limdagi keyingi tajribalar bajarilgan deb belgilanmagan. Avtomatik deploy bajarilmagan. PRODUCTION_CHECKLIST.md dagi qolgan operatsion talablar saqlanadi.
+
+Mahalliy yakuniy tekshiruv: alohida PostgreSQL bazasida 66 backend testi, 4 URL testi, frontend build, 390px/1280px mahsulot brauzer oqimlari va mavjud dizaynning 19 tekshiruv/auditi o‘tdi. Brauzerda API/Telegram javoblari sinov uchun almashtirilgan; haqiqiy Telegram xabar yetkazilishi tasdiqlanmagan. Hosted CI ishga tushgani haqida xulosa berilmagan.

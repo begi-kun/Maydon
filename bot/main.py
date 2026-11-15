@@ -8,6 +8,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from contacts import verified_contact_phone
+from availability_alerts import queue_availability_alerts, subscription_is_current
 from reminders import queue_reminders, pending_notifications, reminder_is_current, mark_notification_sent, mark_notification_failed
 from dotenv import load_dotenv
 import psycopg
@@ -135,12 +136,18 @@ async def deliver_notifications(bot:Bot):
         try:
             with database() as conn:
                 queue_reminders(conn)
+                queue_availability_alerts(conn)
                 rows=pending_notifications(conn)
             for r in rows:
                 try:
                     if r['reminder_booking_id'] is not None:
                         with database() as conn:
                             if not reminder_is_current(conn,r['reminder_booking_id']):
+                                continue
+                    if r['availability_subscription_id'] is not None:
+                        with database() as conn:
+                            if not subscription_is_current(conn,r['availability_subscription_id']):
+                                conn.execute("UPDATE notifications SET retry_after=NOW()+INTERVAL '1 minute' WHERE id=%s", (r['id'],))
                                 continue
                     await bot.send_message(r['recipient_id'],r['body'])
                     with database() as conn:

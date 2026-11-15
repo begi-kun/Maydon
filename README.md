@@ -243,3 +243,30 @@ Deploy order: backend (additive schema), bot, frontend. Existing bookings and
 photos are retained. Application rollback can retain the added tables/columns;
 do not remove them while either updated service is running. The live verification
 script now checks the admin endpoints and frontend features as well as owners.
+
+
+## Product pilot tools (local implementation, deployment pending)
+
+Admin → Pilot reports a selected 14-day window in Uzbekistan time: discovery
+requests, time-filtered conversion, server-side booking requests and distinct
+Telegram customers, decision latency, cancellations, recorded session outcomes,
+and confirmed sessions returning in week two. Owners record attendance/no-show/
+schedule errors after a session; missing outcomes remain unknown. Discovery
+payloads exclude free search text, GPS, phone, names and Telegram initData.
+
+Recurring manual bookings (up to four weeks) use preview, explicit date selection,
+a single transaction and venue lock, with a durable request key for retries.
+Each resulting booking has its own price, payment state and cancellation.
+Availability subscriptions notify once when a previously occupied slot becomes
+free, with cancellation and a final availability check; alerts never reserve slots.
+
+Both post-pilot features default off. Set `ENABLE_RECURRING_BOOKINGS=true` on the
+API only after the pilot decision. Set `ENABLE_AVAILABILITY_ALERTS=true` on both
+API and bot to enable subscriptions and their worker. Deploy backend schema before
+bot/frontend. No deployment is performed by this implementation. See
+[PILOT_RUNBOOK.md](PILOT_RUNBOOK.md) for measurement limits, rollout and rollback.
+
+Validation: `npm test`, `npm run build`, `npm run test:product` in `miniapp/`;
+backend tests with a disposable `TEST_DATABASE_URL` as above. Browser tests use
+controlled API/Telegram doubles; they do not verify real Telegram delivery.
+Linux browser setup: `npx playwright install --with-deps chromium`.

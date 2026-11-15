@@ -33,10 +33,13 @@ def queue_reminders(conn):
 def pending_notifications(conn):
     # Recheck status/time on every retry so stale reminders are never delivered.
     return conn.execute('''
-        SELECT n.id,n.recipient_id,n.body,n.reminder_booking_id
+        SELECT n.id,n.recipient_id,n.body,n.reminder_booking_id,n.availability_subscription_id
         FROM notifications n LEFT JOIN bookings b ON b.id=n.reminder_booking_id
         WHERE n.sent_at IS NULL AND n.retry_after <= NOW() AND
           (n.reminder_booking_id IS NULL OR (b.status='confirmed' AND b.start_at > NOW()))
+          AND (n.availability_subscription_id IS NULL OR EXISTS (
+            SELECT 1 FROM availability_subscriptions s WHERE s.id=n.availability_subscription_id
+            AND s.cancelled_at IS NULL AND s.start_at > NOW()+INTERVAL '5 minutes'))
         ORDER BY n.retry_after,n.id LIMIT 30
     ''').fetchall()
 

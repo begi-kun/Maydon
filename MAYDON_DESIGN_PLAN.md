@@ -1,6 +1,6 @@
 # MAYDON — alohida dizayn rejasi
 
-Sana: 2026-11-15. Holat: rejalashtirilgan; ushbu hujjat dizayn o‘zgarishlari bajarilganini anglatmaydi.
+Sana: 2026-11-15. Holat: dizayn kodi va avtomatik qabul tekshiruvlari bajarildi; frontend Railwayga chiqarildi; haqiqiy telefon tekshiruvi hali tasdiqlanmagan.
 
 Maqsad: telefonda sport va kerakli vaqtni tez tanlash, mos maydonni baholash va bron holatini tushunishni yengillashtirish. To‘q yashil/lime ranglar, MAYDON brendi va mavjud funksiyalar saqlanadi.
 
@@ -65,3 +65,50 @@ Maqsad: telefonda sport va kerakli vaqtni tez tanlash, mos maydonni baholash va 
 - Frontend build o‘tadi; mobil va desktop ko‘rinishlari skrinshot orqali solishtiriladi.
 
 Mahsulot ustuvorliklari va pilot: MAYDON_PRODUCT_PLAN.md. Haftalik bron, kutish ro‘yxati va to‘lov integratsiyasi ushbu dizayn iteratsiyasining doirasiga kirmaydi.
+
+## Bajarilgan ishlar — 2026-11-15
+
+- Bosh sahifadagi katta hero qisqartirildi; sport → vaqt/qidiruv → natijalar tartibi joriy etildi.
+- Sportlar ochiq ko‘rinadi; sana va vaqt bir guruhda. Masofa, xarita va ulashish yordamchi amallar sifatida berildi.
+- Kartalarda manzil, so‘m/soat, tekshirilgan bo‘sh vaqt va davom etish amali ko‘rinadi. Fotosiz stol tennisi/bilyard uchun sportga mos tasvir qo‘shildi; uzun matnlar satrlarga bo‘linadi.
+- Maydonlar yuklanishidagi server xatosi haqiqiy nol natijadan ajratildi va qayta yuklash amali qo‘shildi.
+- Bron xulosasida sana, boshlanish/tugash vaqti, 1 soat narxi va egasi tasdiqlashi kerakligi ko‘rsatiladi. Xatolik/yuklanishda eski tanlov orqali so‘rov yuborish cheklangan.
+- Katta matnda header qayta joylashadi; qidiruv fokus belgisi va mobil tugmalar o‘lchamlari yaxshilandi.
+
+Tekshiruv dalillari: `artifacts/design/` ichida boshlang‘ich va yangi skrinshotlar hamda `check-results.json` saqlanadi. Brauzer tekshiruvlari sinov API javoblari bilan bajariladi; bu haqiqiy backend yoki Telegram integratsiyasi tekshiruvining o‘rnini bosmaydi.
+
+## Yakuniy tekshiruvlar va egalar iteratsiyasi
+
+- [x] Bosh sahifa, kartalar va bron xulosasi 360, 390, 430, 768, 1280 px kengliklarda tekshirildi. 390×844 da birinchi karta boshlanishi pastki navigatsiyadan oldin ko‘rinadi.
+- [x] Uzun nom/manzil, fotosiz maydon, rasm yuklash xatosi, nol natija, server xatosi va sekin internet holatlari tekshirildi.
+- [x] Qidiruvni yangilashda natijalar joyi saqlanadi; avvalgi vaqt tekshirilayotganda “Bo‘sh” tasdig‘i yashiriladi va karta vaqtincha bosilmaydi.
+- [x] Kontrastdagi kamchiliklar tuzatildi; mijoz va egalar oqimlarida axe-core WCAG A/AA/2.1 AA tekshiruvlari xatosiz o‘tdi. Fokuslar, tugma nomlari, `aria-pressed`, 44 px asosiy nishonlar va mazmunga o‘tish havolasi tekshirildi.
+- [x] Kattalashtirilgan matn va klaviatura tufayli qisqargan viewport tekshirildi. Pastki navigatsiya balandligi o‘lchanib, pastki bo‘shliq moslanadi; `safe-area` hisobga olinadi.
+- [x] Telefon ulashish, bot havolasida maydon/vaqt, botdan `venue`/`slot` bilan qaytish va 409 konflikti avtomatik tekshirildi.
+- [x] Haqiqiy lokal FastAPI/PostgreSQL bilan rasm → qidiruv → telefon holati → bron so‘rovi → egasi tasdiqlashi → band vaqt qidiruvdan chiqishi tekshirildi. Telegram identifikatsiyasi va contact oynasi bu testda sinov adapteri orqali berilgan; haqiqiy Telegram qurilmasi deb hisoblanmaydi.
+- [x] Backendning 50 testi, frontendning 4 testi va 22 brauzer tekshiruvi/auditi o‘tdi; frontend build o‘tdi.
+- [x] Egalar iteratsiyasi: bugungi jadvalga qaytish, kutayotgan so‘rovlarga tez o‘tish, alohida qo‘lda bron/vaqtni yopish amallari va holatlarning matnli ko‘rinishi qo‘shildi. Mobil va desktop skrinshotlar saqlandi.
+- [x] Brauzer tekshiruvi CI ga qo‘shildi; skrinshotlar va natijalar artifact sifatida saqlanadi. Hosted CI natijasi ushbu lokal tekshiruvlar bilan tenglashtirilmaydi.
+- [ ] Haqiqiy telefon: Telegram ichida kirish, contact oynasi, botdan qaytish, klaviatura, safe-area va VoiceOver/TalkBack bilan yakuniy tekshiruv. Qurilma bu muhitdan boshqarilmaydi; foydalanuvchiga tekshirish so‘rovi yuborilgan, javob hali olinmagan.
+
+Dalillar: `artifacts/design/check-results.json`, `accessibility-audit.json`, `real-api-results.json`, `backend-test-results.json` va skrinshotlar. `accessibility-before-fixes.json` boshlang‘ich aniqlangan kamchiliklarni, yakuniy audit esa tuzatilgan holatni saqlaydi.
+
+Qayta tekshirish: `cd miniapp && npm test && npm run build && npm run test:design`. Chrome bo‘lmasa `npx playwright install chromium`; kerak bo‘lsa `CHROME_PATH` beriladi. Jonli tekshiruv: `python3 scripts/check_live.py --design` va `cd miniapp && npm run test:design:live` (faqat o‘qiydi).
+
+Reliz faqat dizayn nusxasidan tayyorlandi: shu vaqtda ishchi papkaga qo‘shilayotgan mahsulot/pilot funksiyalari o‘zgartirilmagan va ushbu relizga kiritilmagan. Asos commit va fayl SHA-256 lari `artifacts/design/release-source.json` da, qayta qo‘llash mumkin bo‘lgan o‘zgarishlar `artifacts/design/design-release.patch` da.
+
+## Reliz natijasi
+
+- Railway `Maydon-web`: `ca577424-c8cf-4a60-bfbb-22fb79439488` — **SUCCESS**.
+- Jonli sayt: https://maydon-web-production-3612.up.railway.app
+- `python3 scripts/check_live.py --design` — PASS: API/baza, autentifikatsiya chegaralari, frontend assetlari va dizayn belgilarining mavjudligi.
+- `npm run test:design:live` — PASS: 360/390/430/768/1280 px, haqiqiy rasm, bo‘sh vaqtlar, bron xulosasi, Telegram havolasidagi maydon/vaqt va bosh sahifa/tafsilot WCAG avtomatik auditlari. Productionda bron yaratilmagan.
+- Jonli ko‘rikda aniqlangan ko‘p rasmli galereyaning klaviatura fokusi tuzatildi va regressiya testiga qo‘shildi.
+- Dalillar: `artifacts/design/live-results.json`, `deployment.json`, `live-*.png`.
+- Vaqtinchalik test API jarayonlari va lokal PostgreSQL konteyneri to‘xtatildi.
+
+**Ochiq qabul bandi:** haqiqiy telefondagi Telegram/contact/klaviatura/safe-area va VoiceOver/TalkBack sinovi. Qurilmaga kirish bo‘lmagani uchun bu band bajarilgan deb belgilanmagan. Frontend avtomatik mobil va jonli brauzer tekshiruvlari asosida chiqarildi; rejadagi “haqiqiy mobil tekshiruvdan keyin reliz” ketma-ketligi to‘liq bajarilmagan. Foydalanuvchining telefon tekshiruvi natijasi olinishi kerak.
+
+Desktop menyu bo‘yicha tuzatish: och fondagi faol bo‘lim yozuvi va belgisi to‘q yashilga o‘zgartirildi. Desktop WCAG auditi lokal va jonli tekshiruvga qo‘shildi.
+
+Desktop kontrast hotfix relizi: `550ce01b-e595-4c99-a8f3-6830a94fb947` — SUCCESS. Jonli desktop/mobil auditlari PASS.

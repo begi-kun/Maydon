@@ -51,4 +51,13 @@ jobs:
           cache: npm
           cache-dependency-path: miniapp/package-lock.json
       - run: npm ci
+      - run: npm test
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:design
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: design-checks
+          path: artifacts/design/
+      - run: npm run test:product
