@@ -41,6 +41,68 @@ class OwnerOperationsTests(unittest.TestCase):
     def body(self, hour=10):
         return {'venue_id':self.venue, 'start_at':f'{self.day}T{hour:02}:00:00+05:00', 'customer_name':'Phone customer', 'customer_phone':'+998901234567'}
 
+    def test_table_extension_protects_next_booking(self):
+        with main.db() as conn:
+            conn.execute("UPDATE venues SET sport='billiards' WHERE id=%s", (self.venue,))
+        booking = self.client.post('/owner/manual-bookings', headers=self.owner, json=self.body()).json()['id']
+        path = f'/owner/bookings/{booking}/extend'
+        self.assertEqual(self.client.post(path, headers=self.other).status_code, 404)
+        next_booking = self.client.post('/owner/manual-bookings', headers=self.owner, json=self.body(11)).json()['id']
+        self.assertEqual(self.client.post(path, headers=self.owner).status_code, 409)
+        self.client.post(f'/owner/manual-bookings/{next_booking}/cancel', headers=self.owner)
+        result = self.client.post(path, headers=self.owner)
+        self.assertEqual(result.status_code, 201, result.text)
+        self.assertEqual(result.json()['payment_status'], 'unpaid')
+        self.assertEqual(self.client.post(path, headers=self.owner).status_code, 409)
+        self.assertEqual(self.client.post('/bookings', headers=self.other, json=self.body(11)).status_code, 409)
+
+    def test_telegram_extension_concurrency_and_notification(self):
+        with main.db() as conn:
+            conn.execute("UPDATE venues SET sport='table_tennis' WHERE id=%s", (self.venue,))
+        booking = self.client.post('/bookings', headers=self.other, json=self.body()).json()['id']
+        path = f'/owner/bookings/{booking}/extend'
+        self.assertEqual(self.client.post(path, headers=self.owner).status_code, 409)
+        self.assertEqual(self.client.post(f'/owner/bookings/{booking}/confirmed', headers=self.owner).status_code, 200)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda _: self.client.post(path, headers=self.owner), range(2)))
+        self.assertEqual(sorted(r.status_code for r in results), [201, 409])
+        extension = next(r.json() for r in results if r.status_code == 201)
+        self.assertEqual(extension['user_telegram_id'], 7102)
+        self.assertEqual(extension['source'], 'app')
+        with main.db() as conn:
+            notification = conn.execute('SELECT recipient_id FROM notifications WHERE booking_id=%s', (extension['id'],)).fetchone()
+            actions = conn.execute('SELECT action FROM booking_events WHERE booking_id=%s', (extension['id'],)).fetchall()
+        self.assertEqual(notification['recipient_id'], 7102)
+        self.assertIn(f'extended_from_{booking}', [event['action'] for event in actions])
+
+    def test_table_extension_restrictions_and_price(self):
+        booking = self.client.post('/owner/manual-bookings', headers=self.owner, json=self.body(22)).json()['id']
+        path = f'/owner/bookings/{booking}/extend'
+        self.assertEqual(self.client.post(path, headers=self.owner).status_code, 422)
+        with main.db() as conn:
+            conn.execute("UPDATE venues SET sport='table_tennis' WHERE id=%s", (self.venue,))
+        self.assertEqual(self.client.post(path, headers=self.owner).status_code, 409)
+        booking = self.client.post('/owner/manual-bookings', headers=self.owner, json=self.body()).json()['id']
+        path = f'/owner/bookings/{booking}/extend'
+        block = self.client.post('/owner/blocks', headers=self.owner, json=self.body(11))
+        self.assertEqual(block.status_code, 201, block.text)
+        self.assertEqual(self.client.post(path, headers=self.owner).status_code, 409)
+        with main.db() as conn:
+            conn.execute('DELETE FROM owner_blocks WHERE id=%s', (block.json()['id'],))
+            conn.execute('UPDATE venues SET suspended=true WHERE id=%s', (self.venue,))
+        self.assertEqual(self.client.post(path, headers=self.owner).status_code, 409)
+        with main.db() as conn:
+            conn.execute('UPDATE venues SET suspended=false,price=125000 WHERE id=%s', (self.venue,))
+            conn.execute("UPDATE bookings SET payment_status='paid' WHERE id=%s", (booking,))
+        result = self.client.post(path, headers=self.owner)
+        self.assertEqual(result.status_code, 201, result.text)
+        self.assertEqual(result.json()['booked_price'], 125000)
+        self.assertEqual(result.json()['payment_status'], 'unpaid')
+        self.assertIsNone(result.json()['user_telegram_id'])
+        with main.db() as conn:
+            original = conn.execute('SELECT payment_status FROM bookings WHERE id=%s', (booking,)).fetchone()
+        self.assertEqual(original['payment_status'], 'paid')
+
     def test_manual_conflicts_payment_privacy_history_and_cancel(self):
         self.assertEqual(self.client.post('/owner/manual-bookings',headers=self.other,json=self.body()).status_code,404)
         r=self.client.post('/owner/manual-bookings',headers=self.owner,json=self.body())

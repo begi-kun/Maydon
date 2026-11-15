@@ -8,7 +8,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from contacts import verified_contact_phone
-from reminders import queue_reminders, pending_notifications, reminder_is_current
+from reminders import queue_reminders, pending_notifications, reminder_is_current, mark_notification_sent, mark_notification_failed
 from dotenv import load_dotenv
 import psycopg
 from psycopg.rows import dict_row
@@ -110,7 +110,8 @@ async def decide(call):
             with database() as conn:
                 row=conn.execute("UPDATE bookings SET status=%s WHERE id=%s AND status='pending' AND venue_id IN (SELECT id FROM venues WHERE owner_telegram_id=%s) RETURNING user_telegram_id",(decision,item_id,call.from_user.id)).fetchone()
                 if row:
-                    conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)',(row['user_telegram_id'],f'📅 Bron #{item_id}: {decision}.'))
+                    conn.execute('INSERT INTO booking_events(booking_id,actor_id,action) VALUES (%s,%s,%s)', (item_id,call.from_user.id,decision))
+                    conn.execute('INSERT INTO notifications(recipient_id,body,booking_id) VALUES (%s,%s,%s)',(row['user_telegram_id'],f'📅 Bron #{item_id}: {decision}.',item_id))
         elif kind=='venue' and decision in ('approved','rejected') and str(call.from_user.id)==os.environ.get('ADMIN_TELEGRAM_ID'):
             if decision == 'rejected':
                 await call.answer('Rad etish sababini kiritish uchun Mini App → Profil → Admin panelini oching.', show_alert=True)
@@ -143,11 +144,11 @@ async def deliver_notifications(bot:Bot):
                                 continue
                     await bot.send_message(r['recipient_id'],r['body'])
                     with database() as conn:
-                        conn.execute('UPDATE notifications SET sent_at=NOW() WHERE id=%s AND sent_at IS NULL',(r['id'],))
+                        mark_notification_sent(conn,r['id'])
                 except Exception as exc:
                     logging.warning('Could not deliver notification %s: %s',r['id'],exc)
                     with database() as conn:
-                        conn.execute("UPDATE notifications SET retry_after=NOW() + INTERVAL '1 minute' WHERE id=%s AND sent_at IS NULL",(r['id'],))
+                        mark_notification_failed(conn,r['id'],type(exc).__name__)
         except Exception:
             logging.exception('Notification polling failed')
         await asyncio.sleep(15)

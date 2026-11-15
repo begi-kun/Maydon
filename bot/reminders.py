@@ -44,3 +44,12 @@ def pending_notifications(conn):
 def reminder_is_current(conn, booking_id):
     return conn.execute("SELECT 1 FROM bookings WHERE id=%s AND status='confirmed' AND start_at > NOW()",
                         (booking_id,)).fetchone() is not None
+
+
+def mark_notification_sent(conn, notification_id):
+    conn.execute('UPDATE notifications SET sent_at=NOW(),attempts=attempts+1,last_error=NULL WHERE id=%s AND sent_at IS NULL', (notification_id,))
+
+
+def mark_notification_failed(conn, notification_id, error_type):
+    # Store only the exception type, never Telegram payloads or credentials.
+    conn.execute("UPDATE notifications SET retry_after=NOW() + INTERVAL '1 minute',attempts=attempts+1,last_error=%s WHERE id=%s AND sent_at IS NULL", (error_type,notification_id))

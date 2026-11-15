@@ -17,6 +17,7 @@ import psycopg
 from psycopg.rows import dict_row
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError, field_validator
 from PIL import Image, ImageOps, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
@@ -69,8 +70,12 @@ def authenticate(init_data: str = Header(default='', alias='X-Telegram-Init-Data
     return telegram_identity(init_data)['id']
 
 @app.get('/auth/me')
-def auth_me(init_data: str = Header(default='', alias='X-Telegram-Init-Data')):
+def auth_me(response: Response, init_data: str = Header(default='', alias='X-Telegram-Init-Data')):
     user = telegram_identity(init_data)
+    response.headers['Cache-Control'] = 'private, no-store'
+    if DATABASE_URL:
+        with db() as conn:
+            conn.execute('INSERT INTO telegram_profiles(telegram_id,first_name,username) VALUES (%s,%s,%s) ON CONFLICT (telegram_id) DO UPDATE SET first_name=EXCLUDED.first_name,username=EXCLUDED.username', (user['id'],user['first_name'],user['username']))
     return {**user, 'admin': bool(ADMIN_ID and str(user['id']) == ADMIN_ID)}
 
 @app.get('/auth/config')
@@ -137,7 +142,17 @@ class VenueIn(BaseModel):
     price: int = Field(ge=0, le=100000000)
     phone: str = Field(default='', max_length=40)
     hours: str = Field(default='', max_length=120)
+    amenities: list[str] = Field(default_factory=list, max_length=20)
+    extra_amenities: str = Field(default='', max_length=500)
     photos: list[str] = Field(min_length=1, max_length=5)
+
+    @field_validator('amenities')
+    @classmethod
+    def validate_amenities(cls, values):
+        allowed = {'changing_room', 'shower', 'stands', 'lighting', 'parking', 'toilet', 'drinking_water', 'equipment_rental', 'wifi', 'cafe', 'covered_field', 'lockers'}
+        if any(value not in allowed for value in values):
+            raise ValueError('Unknown amenity')
+        return list(dict.fromkeys(values))
 
     @field_validator('hours')
     @classmethod
@@ -204,6 +219,8 @@ CREATE TABLE IF NOT EXISTS venue_photos (
  id BIGSERIAL PRIMARY KEY, venue_id BIGINT NOT NULL REFERENCES venues(id) ON DELETE CASCADE,
  image BYTEA NOT NULL);
 CREATE INDEX IF NOT EXISTS venue_photos_venue ON venue_photos(venue_id);
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS amenities TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE venues ADD COLUMN IF NOT EXISTS extra_amenities TEXT NOT NULL DEFAULT '';
 ALTER TABLE venues ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE venues ADD COLUMN IF NOT EXISTS suspended BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE venues ADD COLUMN IF NOT EXISTS review_reason TEXT;
@@ -227,6 +244,21 @@ CREATE TABLE IF NOT EXISTS owner_payment_events (
  owner_id BIGINT NOT NULL, payment_status TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS telegram_contacts (
  telegram_id BIGINT PRIMARY KEY, phone TEXT NOT NULL, shared_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS telegram_profiles (
+ telegram_id BIGINT PRIMARY KEY, first_name TEXT NOT NULL DEFAULT '', username TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS booking_events (
+ id BIGSERIAL PRIMARY KEY, booking_id BIGINT NOT NULL REFERENCES bookings(id),
+ actor_id BIGINT, action TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE INDEX IF NOT EXISTS booking_events_booking ON booking_events(booking_id,id);
+CREATE INDEX IF NOT EXISTS admin_actions_created ON admin_actions(created_at DESC,id DESC);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS booking_id BIGINT REFERENCES bookings(id);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS last_error TEXT;
+CREATE INDEX IF NOT EXISTS notifications_booking ON notifications(booking_id);
+CREATE INDEX IF NOT EXISTS notifications_unsent_created ON notifications(created_at,id) WHERE sent_at IS NULL;
+CREATE INDEX IF NOT EXISTS venues_owner ON venues(owner_telegram_id);
+CREATE INDEX IF NOT EXISTS owner_payment_events_booking ON owner_payment_events(booking_id,id);
+CREATE INDEX IF NOT EXISTS admin_actions_entity ON admin_actions(entity_type,entity_id);
 CREATE TABLE IF NOT EXISTS contact_return_links (
  telegram_id BIGINT PRIMARY KEY, venue_id BIGINT, slot BIGINT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 '''
@@ -240,16 +272,38 @@ def initialize():
 
 @app.get('/health')
 def health():
-    with db() as conn:
-        conn.execute('SELECT 1')
-    return {'status':'ok'}
+    # Bound both connection establishment and the probe query during outages.
+    # Do not expose connection strings or database exception details publicly.
+    headers = {'Cache-Control': 'no-store'}
+    if not DATABASE_URL:
+        return JSONResponse({'status': 'unavailable'}, status_code=503, headers=headers)
+    try:
+        with psycopg.connect(DATABASE_URL, connect_timeout=3,
+                             options='-c statement_timeout=3000') as conn:
+            conn.execute('SELECT 1')
+    except psycopg.Error:
+        return JSONResponse({'status': 'unavailable'}, status_code=503, headers=headers)
+    return JSONResponse({'status': 'ok'}, headers=headers)
 
 @app.get('/venues')
-def venues(sport: str | None = None):
+def venues(sport: str | None = None, available_at: datetime | None = None):
+    start = valid_start(available_at) if available_at is not None else None
+    query = """SELECT id,name,sport,address,latitude,longitude,price,phone,hours,amenities,extra_amenities,
+        ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos
+        FROM venues WHERE deleted_at IS NULL AND NOT suspended AND status=%s"""
+    params = ['approved']
+    if sport:
+        query += ' AND sport=%s'
+        params.append(sport)
+    if start:
+        query += """ AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.venue_id=venues.id
+            AND b.start_at=%s AND b.status IN ('pending','confirmed'))
+            AND NOT EXISTS (SELECT 1 FROM owner_blocks ob WHERE ob.venue_id=venues.id AND ob.start_at=%s)"""
+        params.extend([start, start])
+    query += ' ORDER BY id DESC'
     with db() as conn:
-        if sport:
-            return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE deleted_at IS NULL AND NOT suspended AND status=%s AND sport=%s ORDER BY id DESC', ('approved',sport)).fetchall()
-        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE deleted_at IS NULL AND NOT suspended AND status=%s ORDER BY id DESC', ('approved',)).fetchall()
+        rows = conn.execute(query, params).fetchall()
+    return [row for row in rows if not start or is_open(row['hours'], start)]
 
 @app.get('/venues/{venue_id}/availability')
 def availability(venue_id: int, day: date):
@@ -308,7 +362,7 @@ def update_venue(venue_id: int, venue: VenueEdit, user: int):
         if not set(kept).issubset(existing):
             raise HTTPException(422, 'Photo does not belong to this pitch')
         photos = [prepare_photo(photo) for photo in venue.photos]
-        conn.execute("UPDATE venues SET name=%s,sport=%s,address=%s,latitude=%s,longitude=%s,price=%s,phone=%s,hours=%s,status='pending',review_reason=NULL WHERE id=%s", (*venue.model_dump(exclude={'photos', 'keep_photos'}).values(), venue_id))
+        conn.execute("UPDATE venues SET name=%s,sport=%s,address=%s,latitude=%s,longitude=%s,price=%s,phone=%s,hours=%s,amenities=%s,extra_amenities=%s,status='pending',review_reason=NULL WHERE id=%s", (*venue.model_dump(exclude={'photos', 'keep_photos'}).values(), venue_id))
         conn.execute('DELETE FROM venue_photos WHERE venue_id=%s AND NOT (id = ANY(%s::bigint[]))', (venue_id, kept))
         for photo in photos:
             conn.execute('INSERT INTO venue_photos(venue_id,image) VALUES (%s,%s)', (venue_id, photo))
@@ -331,8 +385,8 @@ def delete_venue(venue_id: int, user: int = Depends(authenticate)):
 def save_venue(venue: VenueIn, user: int):
     photos = [prepare_photo(photo) for photo in venue.photos]
     with db() as conn:
-        result = conn.execute('''INSERT INTO venues(name,sport,address,latitude,longitude,price,phone,hours,owner_telegram_id)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''', (*venue.model_dump(exclude={'photos'}).values(),user)).fetchone()
+        result = conn.execute('''INSERT INTO venues(name,sport,address,latitude,longitude,price,phone,hours,amenities,extra_amenities,owner_telegram_id)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''', (*venue.model_dump(exclude={'photos'}).values(),user)).fetchone()
         for photo in photos:
             conn.execute('INSERT INTO venue_photos(venue_id,image) VALUES (%s,%s)', (result['id'], photo))
         if ADMIN_ID:
@@ -350,6 +404,9 @@ def get_photo(photo_id: int, init_data: str = Header(default='', alias='X-Telegr
         if user != row['owner_telegram_id'] and str(user) != ADMIN_ID:
             raise HTTPException(404, 'Photo not found')
     return Response(bytes(row['image']), media_type='image/jpeg', headers={'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff'})
+
+def booking_event(conn, booking_id, actor, action):
+    conn.execute('INSERT INTO booking_events(booking_id,actor_id,action) VALUES (%s,%s,%s)', (booking_id,actor,action))
 
 def audit(conn, actor, entity, item_id, action, reason=None):
     conn.execute('INSERT INTO admin_actions(admin_id,entity_type,entity_id,action,reason) VALUES (%s,%s,%s,%s,%s)',
@@ -402,13 +459,18 @@ def decide_venue(venue_id: int, decision: Literal['approved','rejected','suspend
 @app.get('/admin/bookings')
 def admin_bookings(response: Response, status: Literal['all','pending','confirmed','rejected','cancelled'] = 'all',
                    day: date | None = None, venue_id: int | None = None, booking_id: int | None = None,
+                   customer_id: int | None = None, owner_id: int | None = None, upcoming: bool = False,
                    offset: int = Query(default=0, ge=0), _: int = Depends(admin)):
     response.headers['Cache-Control'] = 'private, no-store'
     clauses, params = [], []
-    for field, value in [('b.status', status if status != 'all' else None), ('b.venue_id', venue_id), ('b.id', booking_id)]:
+    for field, value in [('b.status', status if status != 'all' else None), ('b.venue_id', venue_id), ('b.id', booking_id), ('b.user_telegram_id', customer_id), ('v.owner_telegram_id', owner_id)]:
         if value is not None:
             clauses.append(f'{field}=%s'); params.append(value)
+    if upcoming:
+        clauses.append('b.start_at>NOW()')
     if day:
+        if day == date.max:
+            raise HTTPException(422, 'Sanani tekshiring.')
         start = datetime.combine(day, day_time(), tzinfo=UZBEKISTAN_TIME)
         clauses.append('b.start_at >= %s AND b.start_at < %s'); params.extend([start, start + timedelta(days=1)])
     where = ' AND '.join(clauses) or 'TRUE'
@@ -423,9 +485,10 @@ def admin_cancel(booking_id: int, body: AdminReason, actor: int = Depends(admin)
             raise HTTPException(409, 'Faqat kelgusi faol bronni bekor qilish mumkin. Roʻyxatni yangilang.')
         venue = conn.execute('SELECT name,owner_telegram_id FROM venues WHERE id=%s', (row['venue_id'],)).fetchone()
         audit(conn, actor, 'booking', booking_id, 'cancelled', body.reason)
+        booking_event(conn, booking_id, actor, 'cancelled')
         message = f'📅 Bron #{booking_id} — {venue["name"]} admin tomonidan bekor qilindi.\n{booking_time_label(row["start_at"])}\nSabab: {body.reason}'
         for recipient in {row['user_telegram_id'], venue['owner_telegram_id']} - {None}:
-            conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)', (recipient, message))
+            conn.execute('INSERT INTO notifications(recipient_id,body,booking_id) VALUES (%s,%s,%s)', (recipient, message,booking_id))
     return {'status': 'cancelled'}
 
 @app.post('/bookings', status_code=201)
@@ -442,8 +505,9 @@ def book(booking: BookingIn, user: int = Depends(authenticate)):
             raise HTTPException(422, 'Maydon bu vaqtda yopiq.')
         ensure_free(conn, booking.venue_id, start)
         row = conn.execute('INSERT INTO bookings(venue_id,user_telegram_id,start_at,customer_phone,booked_price) VALUES (%s,%s,%s,%s,%s) RETURNING id', (booking.venue_id,user,start,contact['phone'],venue['price'])).fetchone()
+        booking_event(conn, row['id'], user, 'created')
         owner=conn.execute('SELECT owner_telegram_id,name FROM venues WHERE id=%s',(booking.venue_id,)).fetchone()
-        conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)',(owner['owner_telegram_id'],f'📅 Yangi bron #{row["id"]} — {owner["name"]}\n🕒 {booking_time_label(start)}\n📞 Mijoz: {contact["phone"]} (Telegram orqali ulashilgan)\n/owner'))
+        conn.execute('INSERT INTO notifications(recipient_id,body,booking_id) VALUES (%s,%s,%s)',(owner['owner_telegram_id'],f'📅 Yangi bron #{row["id"]} — {owner["name"]}\n🕒 {booking_time_label(start)}\n📞 Mijoz: {contact["phone"]} (Telegram orqali ulashilgan)\n/owner',row['id']))
     return {'id':row['id'],'status':'pending'}
 
 @app.get('/bookings/me')
@@ -475,7 +539,7 @@ def owner_bookings(response: Response, user: int = Depends(authenticate),
         clauses.append("(b.customer_name ILIKE %s OR b.customer_phone ILIKE %s OR b.id::text=%s)")
         params.extend([f'%{search}%', f'%{search}%', search])
     with db() as conn:
-        return conn.execute(f"SELECT b.*,v.name AS venue_name FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE {' AND '.join(clauses)} ORDER BY b.start_at DESC,b.id DESC LIMIT 50 OFFSET %s", (*params, offset)).fetchall()
+        return conn.execute(f"SELECT b.*,v.name AS venue_name,v.sport FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE {' AND '.join(clauses)} ORDER BY b.start_at DESC,b.id DESC LIMIT 50 OFFSET %s", (*params, offset)).fetchall()
 
 
 class ManualBooking(BookingIn):
@@ -527,7 +591,41 @@ def manual_booking(body: ManualBooking, user: int = Depends(authenticate)):
         if not is_open(venue['hours'], start):
             raise HTTPException(422, 'Maydon bu vaqtda yopiq.')
         ensure_free(conn, body.venue_id, start)
-        return conn.execute("INSERT INTO bookings(venue_id,start_at,status,customer_name,customer_phone,booked_price,source) VALUES (%s,%s,'confirmed',%s,%s,%s,'manual') RETURNING *", (body.venue_id,start,body.customer_name,body.customer_phone,venue['price'])).fetchone()
+        row = conn.execute("INSERT INTO bookings(venue_id,start_at,status,customer_name,customer_phone,booked_price,source) VALUES (%s,%s,'confirmed',%s,%s,%s,'manual') RETURNING *", (body.venue_id,start,body.customer_name,body.customer_phone,venue['price'])).fetchone()
+        booking_event(conn, row['id'], user, 'created_manual')
+        return row
+
+
+@app.post('/owner/bookings/{booking_id}/extend', status_code=201)
+def extend_table_booking(booking_id: int, user: int = Depends(authenticate)):
+    with db() as conn:
+        original = conn.execute('SELECT venue_id FROM bookings WHERE id=%s', (booking_id,)).fetchone()
+        if not original:
+            raise HTTPException(404, 'Bron topilmadi.')
+        venue = owned_venue(conn, original['venue_id'], user)
+        booking = conn.execute('SELECT * FROM bookings WHERE id=%s', (booking_id,)).fetchone()
+        if venue['sport'] not in ('table_tennis', 'billiards'):
+            raise HTTPException(422, 'Uzaytirish faqat stol tennisi va bilyard uchun.')
+        if venue['status'] != 'approved' or venue['suspended'] or booking['status'] != 'confirmed':
+            raise HTTPException(409, 'Faqat faol, tasdiqlangan bron uzaytiriladi.')
+        start = booking['start_at'] + timedelta(hours=1)
+        now = datetime.now(timezone.utc)
+        if start <= now or start > now + timedelta(days=60):
+            raise HTTPException(409, 'Bron vaqti tugagan yoki juda uzoq.')
+        if not is_open(venue['hours'], start):
+            raise HTTPException(409, 'Keyingi soatda yopiq. Seansni vaqtida tugating.')
+        ensure_free(conn, venue['id'], start)
+        row = conn.execute("""INSERT INTO bookings
+            (venue_id,user_telegram_id,start_at,status,customer_name,customer_phone,booked_price,source)
+            VALUES (%s,%s,%s,'confirmed',%s,%s,%s,%s) RETURNING *""",
+            (venue['id'],booking['user_telegram_id'],start,booking['customer_name'],booking['customer_phone'],venue['price'],booking['source'])).fetchone()
+        booking_event(conn, row['id'], user, 'created_manual' if booking['source'] == 'manual' else 'created')
+        booking_event(conn, row['id'], user, f'extended_from_{booking_id}')
+        booking_event(conn, booking_id, user, f'extended_to_{row["id"]}')
+        if booking['user_telegram_id']:
+            conn.execute('INSERT INTO notifications(recipient_id,body,booking_id) VALUES (%s,%s,%s)',
+                (booking['user_telegram_id'], f'Seans 1 soatga uzaytirildi. Bron #{row["id"]} — {venue["name"]} · {booking_time_label(start)}. Narx: {venue["price"]} soʻm.',row['id']))
+        return row
 
 
 @app.post('/owner/blocks', status_code=201)
@@ -577,6 +675,7 @@ def cancel_manual(booking_id: int, user: int = Depends(authenticate)):
         row = conn.execute("UPDATE bookings SET status='cancelled' WHERE id=%s AND source='manual' AND status='confirmed' AND start_at > NOW() AND venue_id IN (SELECT id FROM venues WHERE owner_telegram_id=%s) RETURNING id", (booking_id,user)).fetchone()
         if not row:
             raise HTTPException(404, 'Kelgusi qoʻlda kiritilgan bron topilmadi.')
+        booking_event(conn, booking_id, user, 'cancelled')
     return {'status': 'cancelled'}
 
 
@@ -588,11 +687,13 @@ def owner_schedule(response: Response, venue_id: int, day: date, days: int = Que
     start = datetime.combine(day, day_time(), tzinfo=UZBEKISTAN_TIME)
     end = start + timedelta(days=days)
     with db() as conn:
-        venue = conn.execute('SELECT hours,status,suspended FROM venues WHERE id=%s AND owner_telegram_id=%s AND deleted_at IS NULL', (venue_id,user)).fetchone()
+        venue = conn.execute('SELECT hours,status,suspended,sport FROM venues WHERE id=%s AND owner_telegram_id=%s AND deleted_at IS NULL', (venue_id,user)).fetchone()
         if not venue:
             raise HTTPException(404, 'Maydon topilmadi.')
         bookings = conn.execute("SELECT * FROM bookings WHERE venue_id=%s AND start_at >= %s AND start_at < %s AND status IN ('pending','confirmed')", (venue_id,start,end)).fetchall()
         blocks = conn.execute('SELECT * FROM owner_blocks WHERE venue_id=%s AND start_at >= %s AND start_at < %s', (venue_id,start,end)).fetchall()
+    for booking in bookings:
+        booking['sport'] = venue['sport']
     by_time = {b['start_at']: b for b in bookings}
     blocked = {b['start_at']: b for b in blocks}
     now = datetime.now(timezone.utc)
@@ -624,8 +725,9 @@ def owner_decide(booking_id: int, decision: Literal['confirmed','rejected'], use
         row = conn.execute('''UPDATE bookings SET status=%s WHERE id=%s AND status='pending'
            AND venue_id IN (SELECT id FROM venues WHERE owner_telegram_id=%s) RETURNING id''',(decision,booking_id,user)).fetchone()
         if not row: raise HTTPException(404,'Pending booking not found for owner')
+        booking_event(conn, booking_id, user, decision)
         client=conn.execute('SELECT user_telegram_id FROM bookings WHERE id=%s',(booking_id,)).fetchone()
-        conn.execute('INSERT INTO notifications(recipient_id,body) VALUES (%s,%s)',(client['user_telegram_id'],f'📅 Bron #{booking_id}: {decision}.'))
+        conn.execute('INSERT INTO notifications(recipient_id,body,booking_id) VALUES (%s,%s,%s)',(client['user_telegram_id'],f'📅 Bron #{booking_id}: {decision}.',booking_id))
     return {'status':decision}
 
 @app.post('/bookings/{booking_id}/cancel')
@@ -633,12 +735,13 @@ def cancel(booking_id: int, user: int = Depends(authenticate)):
     with db() as conn:
         row = conn.execute("UPDATE bookings SET status='cancelled' WHERE id=%s AND user_telegram_id=%s AND status='pending' RETURNING id",(booking_id,user)).fetchone()
         if not row: raise HTTPException(404,'Pending booking not found')
+        booking_event(conn, booking_id, user, 'cancelled')
     return {'status':'cancelled'}
 
 @app.get('/owner/venues')
 def owner_venues(user: int = Depends(authenticate)):
     with db() as conn:
-        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours,status,suspended,review_reason, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE owner_telegram_id=%s AND deleted_at IS NULL ORDER BY id DESC',(user,)).fetchall()
+        return conn.execute('SELECT id,name,sport,address,latitude,longitude,price,phone,hours,amenities,extra_amenities,status,suspended,review_reason, ARRAY(SELECT p.id FROM venue_photos p WHERE p.venue_id=venues.id ORDER BY p.id) AS photos FROM venues WHERE owner_telegram_id=%s AND deleted_at IS NULL ORDER BY id DESC',(user,)).fetchall()
 
 @app.get('/admin/status')
 def admin_status(user: int = Depends(authenticate)):
@@ -706,3 +809,123 @@ def admin_analytics(response: Response, from_date: date | None = None, to_date: 
 def owner_analytics(response: Response, from_date: date | None = None, to_date: date | None = None,
                     all_time: bool = False, venue_id: int | None = None, user: int = Depends(authenticate)):
     return booking_analytics(response, user, from_date, to_date, all_time, venue_id)
+
+# Admin operations: all personal information is authenticated and never cached.
+@app.get('/admin/attention')
+def admin_attention(response: Response, _: int = Depends(admin)):
+    response.headers['Cache-Control'] = 'private, no-store'
+    with db() as conn:
+        counts = conn.execute("""SELECT
+            (SELECT count(*) FROM venues WHERE status='pending' AND deleted_at IS NULL) AS venues,
+            (SELECT count(*) FROM bookings WHERE status='pending' AND start_at>NOW()) AS bookings,
+            (SELECT count(*) FROM notifications n LEFT JOIN bookings b ON b.id=n.reminder_booking_id
+             WHERE n.sent_at IS NULL AND (n.attempts>0 OR n.created_at<NOW()-INTERVAL '5 minutes')
+             AND (n.reminder_booking_id IS NULL OR (b.status='confirmed' AND b.start_at>NOW()))) AS notifications""").fetchone()
+        venues = conn.execute("SELECT id,name,owner_telegram_id,suspended FROM venues WHERE status='pending' AND deleted_at IS NULL ORDER BY id LIMIT 20").fetchall()
+        bookings = conn.execute("""SELECT b.id,b.venue_id,v.name AS venue_name,b.start_at,b.created_at,v.owner_telegram_id
+            FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE b.status='pending' AND b.start_at>NOW()
+            ORDER BY b.start_at,b.id LIMIT 20""").fetchall()
+    return {'counts': counts, 'venues': venues, 'bookings': bookings}
+
+
+@app.get('/admin/notifications')
+def admin_notifications(response: Response, offset: int = Query(default=0, ge=0), _: int = Depends(admin)):
+    response.headers['Cache-Control'] = 'private, no-store'
+    with db() as conn:
+        return conn.execute("""SELECT n.id,n.recipient_id,COALESCE(n.booking_id,n.reminder_booking_id) AS booking_id,
+            n.created_at,n.retry_after,n.attempts,n.last_error
+            FROM notifications n LEFT JOIN bookings b ON b.id=n.reminder_booking_id
+            WHERE n.sent_at IS NULL AND (n.attempts>0 OR n.created_at<NOW()-INTERVAL '5 minutes')
+              AND (n.reminder_booking_id IS NULL OR (b.status='confirmed' AND b.start_at>NOW()))
+            ORDER BY n.created_at,n.id LIMIT 50 OFFSET %s""", (offset,)).fetchall()
+
+
+PEOPLE_CTE = """WITH identities AS (
+ SELECT telegram_id FROM telegram_contacts UNION SELECT telegram_id FROM telegram_profiles
+ UNION SELECT owner_telegram_id FROM venues
+ UNION SELECT user_telegram_id FROM bookings WHERE user_telegram_id IS NOT NULL
+), people AS (
+ SELECT 'telegram:'||i.telegram_id AS key,i.telegram_id,NULL::bigint AS booking_id,
+ COALESCE(p.first_name,'') AS name,COALESCE(p.username,'') AS username,
+ COALESCE(c.phone,(SELECT customer_phone FROM bookings WHERE user_telegram_id=i.telegram_id
+     AND customer_phone IS NOT NULL ORDER BY id DESC LIMIT 1),
+     (SELECT NULLIF(phone,'') FROM venues WHERE owner_telegram_id=i.telegram_id AND phone<>'' ORDER BY id DESC LIMIT 1),'') AS phone,
+ (SELECT count(*) FROM venues WHERE owner_telegram_id=i.telegram_id) AS venue_count,
+ (SELECT count(*) FROM bookings WHERE user_telegram_id=i.telegram_id) AS booking_count,
+ (SELECT count(*) FROM bookings WHERE user_telegram_id=i.telegram_id AND status='cancelled') AS cancelled_count
+ FROM identities i LEFT JOIN telegram_profiles p USING(telegram_id) LEFT JOIN telegram_contacts c USING(telegram_id)
+ UNION ALL
+ SELECT 'manual:'||b.id,NULL::bigint,b.id,b.customer_name,''::text,COALESCE(b.customer_phone,''),0::bigint,1::bigint,
+ CASE WHEN b.status='cancelled' THEN 1::bigint ELSE 0::bigint END
+ FROM bookings b WHERE b.user_telegram_id IS NULL
+) """
+
+
+@app.get('/admin/people')
+def admin_people(response: Response, q: str = Query(default='', max_length=120),
+                 role: Literal['all','owners','customers','manual'] = 'all',
+                 offset: int = Query(default=0, ge=0), _: int = Depends(admin)):
+    response.headers['Cache-Control'] = 'private, no-store'
+    clauses, params = [], []
+    if role == 'owners':
+        clauses.append('venue_count>0')
+    elif role == 'customers':
+        clauses.append('booking_count>0')
+    elif role == 'manual':
+        clauses.append('telegram_id IS NULL')
+    if q.strip():
+        clauses.append("(name ILIKE %s OR username ILIKE %s OR phone ILIKE %s OR telegram_id::text=%s)")
+        params.extend([f'%{q.strip()}%']*3+[q.strip()])
+    with db() as conn:
+        return conn.execute(PEOPLE_CTE + 'SELECT * FROM people WHERE '+(' AND '.join(clauses) or 'TRUE')+
+                            ' ORDER BY venue_count DESC,key LIMIT 50 OFFSET %s', (*params,offset)).fetchall()
+
+
+@app.get('/admin/activity')
+def admin_activity(response: Response, entity: Literal['all','venue','booking'] = 'all',
+                   entity_id: int | None = Query(default=None, ge=1),
+                   actor_id: int | None = Query(default=None, ge=1),
+                   action: Literal['all','approved','rejected','suspend','resume','cancelled'] = 'all',
+                   day: date | None = None, offset: int = Query(default=0, ge=0), _: int = Depends(admin)):
+    response.headers['Cache-Control'] = 'private, no-store'
+    clauses, params = [], []
+    for field,value in [('entity_type',entity if entity!='all' else None),('entity_id',entity_id),
+                        ('admin_id',actor_id),('action',action if action!='all' else None)]:
+        if value is not None:
+            clauses.append(field+'=%s'); params.append(value)
+    if day:
+        if day == date.max:
+            raise HTTPException(422, 'Sanani tekshiring.')
+        start = datetime.combine(day,day_time(),tzinfo=UZBEKISTAN_TIME)
+        clauses.append('created_at >= %s AND created_at < %s'); params.extend([start,start+timedelta(days=1)])
+    with db() as conn:
+        return conn.execute('SELECT * FROM admin_actions WHERE '+(' AND '.join(clauses) or 'TRUE')+
+                            ' ORDER BY created_at DESC,id DESC LIMIT 50 OFFSET %s', (*params,offset)).fetchall()
+
+
+@app.get('/admin/bookings/{booking_id}')
+def admin_booking_detail(booking_id: int, response: Response, offset: int = Query(default=0, ge=0), _: int = Depends(admin)):
+    response.headers['Cache-Control'] = 'private, no-store'
+    with db() as conn:
+        booking = conn.execute('SELECT b.*,v.name AS venue_name,v.owner_telegram_id FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE b.id=%s', (booking_id,)).fetchone()
+        if not booking:
+            raise HTTPException(404, 'Bron topilmadi.')
+        complete = conn.execute("SELECT 1 FROM booking_events WHERE booking_id=%s AND action IN ('created','created_manual')", (booking_id,)).fetchone() is not None
+        timeline = conn.execute("""SELECT * FROM (
+            SELECT e.id,e.created_at,e.actor_id,e.action,'booking' AS kind,
+                (SELECT reason FROM admin_actions a WHERE a.entity_type='booking' AND a.entity_id=e.booking_id
+                 AND a.admin_id=e.actor_id AND a.action=e.action AND a.created_at=e.created_at LIMIT 1) AS reason
+            FROM booking_events e WHERE e.booking_id=%s
+            UNION ALL SELECT id,created_at,owner_id,payment_status,'payment',NULL FROM owner_payment_events WHERE booking_id=%s
+            UNION ALL SELECT a.id,a.created_at,a.admin_id,a.action,'admin',a.reason FROM admin_actions a
+              WHERE a.entity_type='booking' AND a.entity_id=%s AND NOT EXISTS (
+                SELECT 1 FROM booking_events e WHERE e.booking_id=a.entity_id AND e.actor_id=a.admin_id
+                  AND e.action=a.action AND e.created_at=a.created_at)
+            ) events ORDER BY created_at,id,kind LIMIT 50 OFFSET %s""", (booking_id,booking_id,booking_id,offset)).fetchall()
+        notifications = conn.execute("""SELECT id,recipient_id,created_at,sent_at,retry_after,attempts,last_error,
+            CASE WHEN sent_at IS NOT NULL THEN 'sent'
+                 WHEN reminder_booking_id IS NOT NULL AND NOT EXISTS (
+                    SELECT 1 FROM bookings WHERE id=reminder_booking_id AND status='confirmed' AND start_at>NOW()) THEN 'expired'
+                 WHEN attempts>0 THEN 'retrying' ELSE 'queued' END AS delivery_status
+            FROM notifications WHERE booking_id=%s OR reminder_booking_id=%s ORDER BY id DESC LIMIT 50""", (booking_id,booking_id)).fetchall()
+    return {'booking':booking,'history_complete':complete,'timeline':timeline,'notifications':notifications}

@@ -1,6 +1,16 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {ImagePlus} from 'lucide-react';
 
+export const AMENITIES = [
+ ['changing_room','Kiyim almashtirish xonasi'],['shower','Dush'],['stands','Tribuna'],['lighting','Yoritish uskunalari'],
+ ['parking','Avtoturargoh'],['toilet','Hojatxona'],['drinking_water','Ichimlik suvi'],['equipment_rental','Sport anjomlari ijarasi'],
+ ['wifi','Wi-Fi'],['cafe','Kafe / bufet'],['covered_field','Yopiq maydon'],['lockers','Buyumlar uchun shkaflar'],
+] as const;
+export function VenueAmenities({amenities=[],extra_amenities=''}:{amenities?:string[];extra_amenities?:string}) {
+ const available=AMENITIES.filter(([value])=>amenities.includes(value));
+ return available.length||extra_amenities?<section className="venue-amenities"><h3>Qulayliklar</h3><ul>{available.map(([value,label])=><li key={value}>{label}</li>)}</ul>{extra_amenities&&<p className="extra-amenities">{extra_amenities}</p>}</section>:null;
+}
+
 export const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 export const authHeaders = () => ({'X-Telegram-Init-Data': window.Telegram?.WebApp?.initData || ''});
 export const directions = (lat:number, lon:number) => `https://yandex.com/maps/?rtext=~${lat},${lon}&rtt=auto`;
@@ -35,7 +45,7 @@ export function loadMaps():Promise<any> {
  });return mapsPromise;
 }
 type Location={latitude:number;longitude:number;address:string};
-export type OwnerVenue=Location & {id:number;name:string;sport:string;price:number;phone:string;hours:string;photos?:number[]};
+export type OwnerVenue=Location & {id:number;name:string;sport:string;price:number;phone:string;hours:string;photos?:number[];amenities?:string[];extra_amenities?:string};
 function LocationPicker({onChange,initial}:{onChange:(value:Location|null)=>void;initial?:Location}) {
  const element=useRef<HTMLDivElement>(null);const map=useRef<any>();const marker=useRef<any>();
  const [location,setLocation]=useState<Location|null>(initial?{latitude:initial.latitude,longitude:initial.longitude,address:initial.address}:null);const [error,setError]=useState('');const [gps,setGps]=useState(false);
@@ -99,7 +109,7 @@ export function OwnerForm({onSaved,onExpired,initial,onCancel}:{onSaved:()=>void
   if(!location){setError('Maydon joylashuvini xaritada bosing yoki “Hozirgi joylashuvim” tugmasidan foydalaning.');return;}
   if(!photos.length&&!kept.length){setError('Maydonning kamida bitta rasmini yuklang.');return;}
   const data=new FormData(form);setBusy(true);setError('');
-  try{const response=await fetch(initial?`${API}/owner/venues/${initial.id}/edit`:`${API}/venues`,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({...Object.fromEntries(data.entries()),price:Number(data.get('price')),...location,photos,...(initial?{keep_photos:kept}:{})})});
+  try{const response=await fetch(initial?`${API}/owner/venues/${initial.id}/edit`:`${API}/venues`,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({...Object.fromEntries(data.entries()),price:Number(data.get('price')),amenities:data.getAll('amenities'),...location,photos,...(initial?{keep_photos:kept}:{})})});
    if(response.status===401){onExpired();throw Error('Kirish muddati tugadi. Ilovani Telegramdan qayta oching.');}
    if(!response.ok){const body=await response.json();throw Error(typeof body.detail==='string'?body.detail:'Maʼlumotlarni tekshiring.');}
    setSaved(true);onSaved();
@@ -112,6 +122,9 @@ export function OwnerForm({onSaved,onExpired,initial,onCancel}:{onSaved:()=>void
   <label>Bir soat narxi (soʻm)<input name="price" defaultValue={initial?.price} type="number" min={0} max={100000000} step={1} required/></label>
   <label>Aloqa telefoni<input name="phone" defaultValue={initial?.phone} type="tel" maxLength={40} required/></label>
   <label>Ish vaqti<input name="hours" defaultValue={initial?.hours} placeholder="08:00–23:00 yoki 24/7" maxLength={120} required/></label>
+  <fieldset className="amenities-picker"><legend>Maydon qulayliklari</legend><p>Mavjud qulayliklarni belgilang.</p><div className="amenities-grid">{AMENITIES.map(([value,label])=><label key={value}><input type="checkbox" name="amenities" value={value} defaultChecked={initial?.amenities?.includes(value)}/>{label}</label>)}</div>
+   <label>Boshqa qulayliklar<textarea name="extra_amenities" defaultValue={initial?.extra_amenities} maxLength={500} rows={3} placeholder="Masalan: bolalar uchun joy, isitiladigan xona. Pullik xizmatlar bo‘lsa, narxini ham yozing."/></label>
+  </fieldset>
   <LocationPicker onChange={setLocation} initial={initial}/>
   <label className="upload-label">Maydon rasmlari (1–5 ta)<span className="upload-zone"><ImagePlus size={29}/><strong>{processing?'Rasmlar tayyorlanmoqda…':'Rasmlarni tanlang'}</strong><small>JPEG, PNG yoki WebP · 10 MB gacha</small><input aria-label="Maydon rasmlarini tanlash" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={processing} onChange={async event=>{
    const files=Array.from(event.target.files||[]);event.target.value='';if(!files.length)return;
