@@ -527,7 +527,7 @@ def owner_bookings(response: Response, user: int = Depends(authenticate),
         clauses.append("(b.customer_name ILIKE %s OR b.customer_phone ILIKE %s OR b.id::text=%s)")
         params.extend([f'%{search}%', f'%{search}%', search])
     with db() as conn:
-        return conn.execute(f"SELECT b.*,v.name AS venue_name FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE {' AND '.join(clauses)} ORDER BY b.start_at DESC,b.id DESC LIMIT 50 OFFSET %s", (*params, offset)).fetchall()
+        return conn.execute(f"SELECT b.*,v.name AS venue_name,v.sport FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE {' AND '.join(clauses)} ORDER BY b.start_at DESC,b.id DESC LIMIT 50 OFFSET %s", (*params, offset)).fetchall()
 
 
 class ManualBooking(BookingIn):
@@ -581,6 +581,38 @@ def manual_booking(body: ManualBooking, user: int = Depends(authenticate)):
         ensure_free(conn, body.venue_id, start)
         row = conn.execute("INSERT INTO bookings(venue_id,start_at,status,customer_name,customer_phone,booked_price,source) VALUES (%s,%s,'confirmed',%s,%s,%s,'manual') RETURNING *", (body.venue_id,start,body.customer_name,body.customer_phone,venue['price'])).fetchone()
         booking_event(conn, row['id'], user, 'created_manual')
+        return row
+
+
+@app.post('/owner/bookings/{booking_id}/extend', status_code=201)
+def extend_table_booking(booking_id: int, user: int = Depends(authenticate)):
+    with db() as conn:
+        original = conn.execute('SELECT venue_id FROM bookings WHERE id=%s', (booking_id,)).fetchone()
+        if not original:
+            raise HTTPException(404, 'Bron topilmadi.')
+        venue = owned_venue(conn, original['venue_id'], user)
+        booking = conn.execute('SELECT * FROM bookings WHERE id=%s', (booking_id,)).fetchone()
+        if venue['sport'] not in ('table_tennis', 'billiards'):
+            raise HTTPException(422, 'Uzaytirish faqat stol tennisi va bilyard uchun.')
+        if venue['status'] != 'approved' or venue['suspended'] or booking['status'] != 'confirmed':
+            raise HTTPException(409, 'Faqat faol, tasdiqlangan bron uzaytiriladi.')
+        start = booking['start_at'] + timedelta(hours=1)
+        now = datetime.now(timezone.utc)
+        if start <= now or start > now + timedelta(days=60):
+            raise HTTPException(409, 'Bron vaqti tugagan yoki juda uzoq.')
+        if not is_open(venue['hours'], start):
+            raise HTTPException(409, 'Keyingi soatda yopiq. Seansni vaqtida tugating.')
+        ensure_free(conn, venue['id'], start)
+        row = conn.execute("""INSERT INTO bookings
+            (venue_id,user_telegram_id,start_at,status,customer_name,customer_phone,booked_price,source)
+            VALUES (%s,%s,%s,'confirmed',%s,%s,%s,%s) RETURNING *""",
+            (venue['id'],booking['user_telegram_id'],start,booking['customer_name'],booking['customer_phone'],venue['price'],booking['source'])).fetchone()
+        booking_event(conn, row['id'], user, 'created_manual' if booking['source'] == 'manual' else 'created')
+        booking_event(conn, row['id'], user, f'extended_from_{booking_id}')
+        booking_event(conn, booking_id, user, f'extended_to_{row["id"]}')
+        if booking['user_telegram_id']:
+            conn.execute('INSERT INTO notifications(recipient_id,body,booking_id) VALUES (%s,%s,%s)',
+                (booking['user_telegram_id'], f'Seans 1 soatga uzaytirildi. Bron #{row["id"]} — {venue["name"]} · {booking_time_label(start)}. Narx: {venue["price"]} soʻm.',row['id']))
         return row
 
 
@@ -643,11 +675,13 @@ def owner_schedule(response: Response, venue_id: int, day: date, days: int = Que
     start = datetime.combine(day, day_time(), tzinfo=UZBEKISTAN_TIME)
     end = start + timedelta(days=days)
     with db() as conn:
-        venue = conn.execute('SELECT hours,status,suspended FROM venues WHERE id=%s AND owner_telegram_id=%s AND deleted_at IS NULL', (venue_id,user)).fetchone()
+        venue = conn.execute('SELECT hours,status,suspended,sport FROM venues WHERE id=%s AND owner_telegram_id=%s AND deleted_at IS NULL', (venue_id,user)).fetchone()
         if not venue:
             raise HTTPException(404, 'Maydon topilmadi.')
         bookings = conn.execute("SELECT * FROM bookings WHERE venue_id=%s AND start_at >= %s AND start_at < %s AND status IN ('pending','confirmed')", (venue_id,start,end)).fetchall()
         blocks = conn.execute('SELECT * FROM owner_blocks WHERE venue_id=%s AND start_at >= %s AND start_at < %s', (venue_id,start,end)).fetchall()
+    for booking in bookings:
+        booking['sport'] = venue['sport']
     by_time = {b['start_at']: b for b in bookings}
     blocked = {b['start_at']: b for b in blocks}
     now = datetime.now(timezone.utc)

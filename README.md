@@ -196,6 +196,20 @@ amounts, or issue refunds. Cancelled bookings retain their payment state.
 Deploy the backend schema and updated bot reminder worker before enabling the new
 frontend; manual bookings have a nullable Telegram customer ID.
 
+## Billiards and table tennis extensions
+
+These sessions begin with a one-hour booking. Owners can extend a confirmed
+session by one hour while its current hour has not ended. The next hour must
+be open and free of pending bookings, confirmed bookings and owner blocks.
+Extensions use the same venue lock as other booking actions to prevent overlap.
+
+Each extension creates a separate confirmed booking at the venue's current
+hourly price, initially unpaid. The original booking and payment status remain
+intact. Telegram customers receive an extension notification; manual bookings
+retain their customer details without creating a Telegram identity. Both booking
+timelines record the link. Owners extend again from the new booking if needed.
+Deploy the backend before the frontend.
+
 ## Admin operations release
 
 The admin panel now opens on **Eʼtibor**: full counts of pending venue reviews,
