@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {API, authHeaders} from './owner';
 
-export type AdminTab = 'attention'|'analytics'|'venues'|'bookings'|'people'|'activity'|'notifications';
+export type AdminTab = 'attention'|'pilot'|'analytics'|'venues'|'bookings'|'people'|'activity'|'notifications';
 export type Navigate = (tab:AdminTab, filters?:Record<string,string>)=>void;
 const labels:Record<string,string> = {created:'Bron yaratildi',created_manual:'Egasi qoʻlda kiritdi',pending:'Kutilmoqda',confirmed:'Tasdiqlangan',rejected:'Rad etilgan',cancelled:'Bekor qilingan',approved:'Tasdiqlangan',suspend:'Toʻxtatilgan',resume:'Qayta ochilgan',unpaid:'Toʻlanmagan',deposit:'Avans qayd etilgan',paid:'Toʻlangan deb qayd etilgan',sent:'Telegram qabul qildi',queued:'Navbatda',retrying:'Qayta yuborilmoqda',expired:'Eslatma muddati oʻtgan'};
 const label=(s:string)=>labels[s]||s;

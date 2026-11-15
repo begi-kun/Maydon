@@ -1,0 +1,112 @@
+{
+  "checkedAt": "2026-11-15T17:07:37.526Z",
+  "environment": "Local Vite + controlled API/Telegram test doubles; not a real Telegram device",
+  "checks": [
+    "all viewports",
+    "44px primary targets",
+    "keyboard focus",
+    "no horizontal overflow at enlarged text",
+    "refresh position stable and no stale available label",
+    "bot return venue and slot",
+    "contact sharing",
+    "pending booking",
+    "409 invalidation",
+    "owner pending shortcut",
+    "manual booking and blocking"
+  ],
+  "results": [
+    {
+      "width": 360,
+      "firstCardTop": 792.765625,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "firstCardTop": 724.515625,
+      "overflow": false
+    },
+    {
+      "width": 430,
+      "firstCardTop": 674.515625,
+      "overflow": false
+    },
+    {
+      "width": 768,
+      "firstCardTop": 739.65625,
+      "overflow": false
+    },
+    {
+      "width": 1280,
+      "firstCardTop": 739.65625,
+      "overflow": false
+    },
+    {
+      "name": "home-desktop",
+      "violations": []
+    },
+    {
+      "name": "home",
+      "violations": []
+    },
+    {
+      "name": "booking-login",
+      "violations": []
+    },
+    {
+      "name": "booking-contact",
+      "violations": []
+    },
+    {
+      "name": "pending-booking",
+      "violations": []
+    },
+    {
+      "name": "booking-conflict",
+      "violations": []
+    },
+    {
+      "name": "empty",
+      "violations": []
+    },
+    {
+      "name": "error",
+      "violations": []
+    },
+    {
+      "name": "long",
+      "violations": []
+    },
+    {
+      "name": "slow",
+      "violations": []
+    },
+    {
+      "name": "search-error",
+      "violations": []
+    },
+    {
+      "name": "photo-error",
+      "violations": []
+    },
+    {
+      "name": "gallery-scroll",
+      "violations": []
+    },
+    {
+      "name": "owner-schedule",
+      "violations": []
+    },
+    {
+      "name": "owner-pending",
+      "violations": []
+    },
+    {
+      "name": "owner-block-editor",
+      "violations": []
+    },
+    {
+      "name": "owner-manual-editor",
+      "violations": []
+    }
+  ]
+}

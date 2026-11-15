@@ -5,7 +5,7 @@ import {API, authHeaders} from './owner';
 export function BookingContact({venueId,time,botUsername,onChange}:{venueId:number;time:string;botUsername:string;onChange:(phone:string|null)=>void}){
  const [phone,setPhone]=useState<string|null>(null);const [waiting,setWaiting]=useState(false);const [error,setError]=useState('');
  useEffect(()=>{let active=true;
-  async function refresh(){try{const response=await fetch(`${API}/auth/contact`,{headers:authHeaders()});if(!response.ok)throw Error();const data=await response.json();if(active){setPhone(data.phone);onChange(data.phone);}}catch{if(active)setError('Raqamni tekshirib boʻlmadi. Telegramdan qayta oching.');}}
+  async function refresh(){try{const response=await fetch(`${API}/auth/contact`,{headers:authHeaders()});if(!response.ok)throw Error();const data=await response.json();if(active){setPhone(data.phone);onChange(data.phone);setError('');}}catch{if(active)setError('Raqamni tekshirib boʻlmadi. Telegramdan qayta oching.');}}
   refresh();window.addEventListener('focus',refresh);return()=>{active=false;window.removeEventListener('focus',refresh)};
  },[onChange]);
  useEffect(()=>{if(!waiting)return;let active=true;let count=0;

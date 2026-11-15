@@ -18,15 +18,15 @@ export const directions = (lat:number, lon:number) => `https://yandex.com/maps/?
 export const mapLocation = (lat:number, lon:number) => `https://yandex.com/maps/?${new URLSearchParams({ll:`${lon},${lat}`,pt:`${lon},${lat}`,z:'18',l:'map'})}`;
 
 export function PhotoGallery({ids=[]}:{ids?:number[]}) {
- return <div className="photos">{ids.map(id=><PitchPhoto key={id} id={id}/>)}</div>;
+ return <div className="photos" tabIndex={ids.length>1?0:undefined} role={ids.length>1?'group':undefined} aria-label={ids.length>1?'Maydon rasmlari — yon tomonga suring':undefined}>{ids.map(id=><PitchPhoto key={id} id={id}/>)}</div>;
 }
 function PitchPhoto({id}:{id:number}) {
- const [url,setUrl]=useState('');
- useEffect(()=>{let active=true;let objectUrl='';const abort=new AbortController();
-  fetch(`${API}/photos/${id}`,{headers:authHeaders(),signal:abort.signal}).then(r=>{if(!r.ok)throw Error();return r.blob()}).then(blob=>{if(active){objectUrl=URL.createObjectURL(blob);setUrl(objectUrl)}}).catch(()=>{});
+ const [url,setUrl]=useState('');const [failed,setFailed]=useState(false);
+ useEffect(()=>{setUrl('');setFailed(false);let active=true;let objectUrl='';const abort=new AbortController();
+  fetch(`${API}/photos/${id}`,{headers:authHeaders(),signal:abort.signal}).then(r=>{if(!r.ok)throw Error();return r.blob()}).then(blob=>{if(active){objectUrl=URL.createObjectURL(blob);setUrl(objectUrl)}}).catch(()=>{if(active&&!abort.signal.aborted)setFailed(true)});
   return()=>{active=false;abort.abort();if(objectUrl)URL.revokeObjectURL(objectUrl)};
  },[id]);
- return url?<img src={url} alt="Maydon rasmi"/>:<span>Rasm yuklanmoqda…</span>;
+ return failed?<span className="photo-unavailable">Rasm mavjud emas</span>:url?<img src={url} onError={()=>setFailed(true)} alt="Maydon rasmi"/>:<span role="status">Rasm yuklanmoqda…</span>;
 }
 
 let mapsPromise:Promise<any>|undefined;

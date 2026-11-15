@@ -13,7 +13,7 @@ def fetch(url):
         return response.read().decode('utf-8')
 
 
-def check(api, web):
+def check(api, web, design=False):
     if json.loads(fetch(api + '/health')) != {'status': 'ok'}:
         raise ValueError('API is not healthy')
     print('PASS: API and database health')
@@ -42,15 +42,20 @@ def check(api, web):
     if not all(value in bundle for value in (api, '/owner/schedule', '/owner/manual-bookings', '/admin/attention', '/admin/people', '/admin/activity')):
         raise ValueError('Frontend owner/admin features or API origin do not match')
     print('PASS: frontend assets, owner/admin features and API origin')
+    if design:
+        if not all(value in bundle for value in ('welcome-compact', 'booking-explanation', 'owner-quick-actions', 'main-content')):
+            raise ValueError('Frontend design release is missing')
+        print('PASS: compact discovery, booking summary, owner actions and keyboard navigation')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--api', default='https://maydon-production-ba2c.up.railway.app')
     parser.add_argument('--web', default='https://maydon-web-production-3612.up.railway.app')
+    parser.add_argument('--design', action='store_true', help='Also require the November design release')
     args = parser.parse_args()
     try:
-        check(args.api.rstrip('/'), args.web.rstrip('/'))
+        check(args.api.rstrip('/'), args.web.rstrip('/'), args.design)
     except (HTTPError, URLError, TimeoutError, ValueError, KeyError):
         # Avoid printing response bodies or connection details into deployment logs.
         print('FAIL: deployment check failed; inspect service health, authentication and assets.', file=sys.stderr)
