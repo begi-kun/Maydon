@@ -47,3 +47,5 @@
 .venue-content .venue-distance{min-height:42px;white-space:normal;align-items:flex-start;margin:10px 0 15px;line-height:1.5}
 .venue-distance>svg{margin-top:2px}.venue-distance small{display:block;color:var(--muted);font-size:10px;font-weight:400;margin-top:2px}
 @media(max-width:600px){.search-filter-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.search-filter-controls .nearby-filter{grid-column:1/-1}.search-filter-controls>button:not(.nearby-filter){justify-self:stretch}}
+
+.search-filters option:disabled{color:#8a948c;background:#f0f2f0}
