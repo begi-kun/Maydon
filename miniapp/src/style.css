@@ -80,3 +80,6 @@
 @media(min-width:901px){.bottom-nav button.on{color:var(--green)}}
 
 .booking-card{position:relative}.booking-venue-link{position:absolute;inset:0;width:100%;height:100%;border-radius:inherit;background:transparent}.booking-venue-link:hover{background:#153e2e05}.booking-card>.text-danger{position:relative;z-index:1}
+
+/* Keep quick times in one scrollable row so results remain visible on mobile. */
+.quick-times{flex-wrap:nowrap;overflow-x:auto}.quick-times button{flex-shrink:0;white-space:nowrap}
