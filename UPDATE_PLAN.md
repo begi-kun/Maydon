@@ -19,12 +19,14 @@ Updated November 12, 2026. Priorities reflect risk to real bookings, then owner/
 - Deployed backend `7190ecce-697b-4ee4-bada-dbd355f1b31e`. Live checks passed for health/database, owner/admin authentication, frontend compatibility, public availability, 413 body rejection and 429 with Uzbek retry guidance/CORS. Changing spoofed forwarding headers did not evade the quota; ordinary guest reads stayed available. Runtime confirmed edge trust, disabled implicit Uvicorn proxy parsing and the shared quota table. Evidence: `artifacts/operations/abuse-protection-2026-11-18.json`.
 - Railway production explicitly trusts its public edge X-Real-IP header; private services in this environment remain within the trust boundary. See README for allowances and rollback. Real Telegram phone journeys and the other operational requirements below remain outstanding.
 
-## 3. Recovery and monitoring
+## 3. Recovery and monitoring — logical restore drill passed (November 19, 2026)
 
-- Verify backups by restoring into an isolated database and checking booking counts and photos.
+- Completed a consistent-snapshot logical backup and isolated PostgreSQL 18.6 restore. All 17 public table counts/content fingerprints matched, including 12 bookings and 8 photos; all photos decoded, foreign keys and ID sequences passed. Source database identity matches the live API. Private backup archives remain in Git-ignored `.backups/`; no production tables were changed and no API/bot was attached to the restore.
+- Repeatable tool: `scripts/verify_backup_restore.py`; runbook: `RECOVERY_RUNBOOK.md`; sanitized evidence: `artifacts/operations/backup-restore-2026-11-19.json`.
+- Scheduled Railway volume-backup frequency/retention and a scheduled-snapshot restore remain unverified. A fresh logical drill does not establish an RPO/RTO or off-machine backup policy.
 - Introduce versioned migrations, testing upgrades from the current schema and repeat execution.
 - Configure external uptime and notification-backlog alerts with an identified response owner.
-- Document application rollback separately from database recovery.
+- Application rollback is documented separately from database recovery in RECOVERY_RUNBOOK.md.
 
 ## 4. Customer trust and support
 

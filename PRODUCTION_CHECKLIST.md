@@ -1,6 +1,6 @@
 # MAYDON production checklist
 
-Updated November 12, 2026. Production runs on Railway; see README.md for deployment commands.
+Updated November 19, 2026. Production runs on Railway; see README.md for deployment commands.
 
 ## Shipped
 
@@ -22,8 +22,9 @@ Updated November 12, 2026. Production runs on Railway; see README.md for deploym
 
 ## Remaining before wider public promotion
 
-- [ ] Shared rate limits and request-size protection.
-- [ ] Backups verified by an isolated restore.
+- [x] Shared rate limits and request-size protection deployed and live-checked.
+- [x] Fresh logical backup verified by an isolated PostgreSQL 18.6 restore: all 17 tables, 12 bookings and 8 photos matched; photos decoded. See RECOVERY_RUNBOOK.md and the November 19 recovery evidence.
+- [ ] Verify scheduled Railway backup frequency/retention and recovery from an existing scheduled snapshot; name the response owner.
 - [ ] Versioned migrations with upgrade tests.
 - [ ] External alerts and notification-backlog monitoring.
 - [ ] Accurate privacy/support information, retention and deletion process.
