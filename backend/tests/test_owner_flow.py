@@ -21,6 +21,13 @@ os.environ['CORS_ORIGINS'] = 'https://example.test'
 os.environ['DATABASE_URL'] = os.environ.get('TEST_DATABASE_URL', '')
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import main
+
+# Access tests use shared quotas before the first TestClient lifespan.
+if os.environ.get("TEST_DATABASE_URL"):
+    main.initialize()
+    with main.db() as conn:
+        conn.execute("TRUNCATE request_limits")
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'bot'))
 from contacts import verified_contact_phone
 
