@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-19T03:50:18.793Z",
+  "checkedAt": "2026-11-19T18:52:30.677Z",
   "environment": "Local Vite + controlled API/Telegram test doubles; not a real Telegram device",
   "checks": [
     "all viewports",
@@ -17,27 +17,27 @@
   "results": [
     {
       "width": 360,
-      "firstCardTop": 792.765625,
+      "firstCardTop": 560.953125,
       "overflow": false
     },
     {
       "width": 390,
-      "firstCardTop": 724.515625,
+      "firstCardTop": 508.984375,
       "overflow": false
     },
     {
       "width": 430,
-      "firstCardTop": 674.515625,
+      "firstCardTop": 508.984375,
       "overflow": false
     },
     {
       "width": 768,
-      "firstCardTop": 739.65625,
+      "firstCardTop": 625.984375,
       "overflow": false
     },
     {
       "width": 1280,
-      "firstCardTop": 739.65625,
+      "firstCardTop": 625.984375,
       "overflow": false
     },
     {
