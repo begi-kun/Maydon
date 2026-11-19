@@ -17,6 +17,17 @@ try{
   window.ymaps={ready:f=>f(),Map,Clusterer:Cluster,Placemark:Marker};
  });
  console.log('Opening app');await page.goto('http://127.0.0.1:5193',{waitUntil:'domcontentloaded'});console.log('Opening map');await page.locator('.map-toggle').click();await page.locator('.map-result').nth(1).waitFor();
+ const sports=page.getByLabel('Sport turi',{exact:true});
+ await sports.getByRole('button',{name:'Futbol',exact:true}).click();
+ await page.waitForFunction(()=>window.__map.cluster.items.length===1);
+ assert.equal(await page.locator('.map-result').count(),1);
+ assert.match(await page.locator('.map-result').innerText(),/Arena one/);
+ await sports.getByRole('button',{name:'Stol tennisi',exact:true}).click();
+ await page.waitForFunction(()=>window.__map.cluster.items.length===0);
+ assert.equal(await page.locator('.map-result').count(),0);
+ await page.getByText('Filtrlarga mos maydon yoʻq.',{exact:false}).waitFor();
+ await sports.getByRole('button',{name:'Barchasi',exact:true}).click();
+ await page.waitForFunction(()=>window.__map.cluster.items.length===2);
  await page.locator('.map-result').first().click();await page.locator('.map-preview').waitFor();assert.match(await page.locator('.map-preview').innerText(),/Arena one/);
  await page.evaluate(()=>window.__map.cluster.items[1].events.fire('click'));assert.match(await page.locator('.map-preview').innerText(),/Arena two/);
  await page.evaluate(()=>{window.__map.area=[[40.99,71.66],[41.005,71.675]];window.__map.events.fire('boundschange')});await page.waitForTimeout(250);assert.equal(await page.locator('.map-result').count(),1);
