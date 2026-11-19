@@ -9,7 +9,7 @@ type Bounds=[[number,number],[number,number]];
 const sportLabel=(sport:string)=>({football:'Futbol',table_tennis:'Stol tennisi',billiards:'Bilyard'}[sport]||sport);
 const money=(value:number)=>new Intl.NumberFormat('uz-UZ').format(value);
 
-export function MapExplorer<T extends MapVenue>({venues,onSelect,time}:{venues:T[];onSelect:(venue:T)=>void;time?:string}){
+export function MapExplorer<T extends MapVenue>({venues,onSelect,time,sportFilters}:{sportFilters:React.ReactNode;venues:T[];onSelect:(venue:T)=>void;time?:string}){
  const container=useRef<HTMLDivElement>(null);const map=useRef<any>(null);const cluster=useRef<any>(null);const api=useRef<any>(null);
  const [ready,setReady]=useState(false);const [error,setError]=useState('');const [retry,setRetry]=useState(0);
  const [bounds,setBounds]=useState<Bounds|null>(null);const [selectedId,setSelectedId]=useState<number|null>(null);
@@ -46,12 +46,15 @@ export function MapExplorer<T extends MapVenue>({venues,onSelect,time}:{venues:T
  function choose(venue:T){setSelectedId(venue.id);setGroupIds(null);map.current?.panTo([venue.latitude,venue.longitude],{duration:250})}
  function showAll(){setGroupIds(null);const area=cluster.current?.getBounds();if(area)map.current.setBounds(area,{checkZoomRange:true,zoomMargin:45,maxZoom:15})}
  return <section className="map-explorer" aria-label="Maydonlarni xaritada qidirish">
-  <div className="map-explorer-canvas">
+  <div className="map-explorer-panel">
+   <div className="map-sport-filters">{sportFilters}</div>
+   <div className="map-explorer-canvas">
    <div ref={container} className="explorer-map" aria-label="Sport maydonlari xaritasi"/>
    {!ready&&!error&&<p className="map-loading" role="status">Xarita yuklanmoqda…</p>}
    {error&&<div className="map-error" role="alert"><p>{error}</p><button onClick={()=>setRetry(n=>n+1)}>Qayta urinish</button></div>}
    {ready&&<button className="map-show-all" onClick={showAll}>Barcha maydonlarni koʻrsatish</button>}
    {selected&&<article className="map-preview" aria-label="Tanlangan maydon"><button className="map-preview-close" aria-label="Maydon kartasini yopish" onClick={()=>setSelectedId(null)}><X size={18}/></button>{!!selected.photos?.length&&<PhotoGallery ids={selected.photos.slice(0,1)}/>}<span className="eyebrow">{sportLabel(selected.sport)}</span><h3>{selected.name}</h3><p>{selected.address}</p><strong>{money(selected.price)} soʻm / soat</strong>{time&&<p>{time} · 1 soat uchun boʻsh</p>}<button className="primary compact" onClick={()=>onSelect(selected)}>Vaqt tanlash va bron <ArrowRight size={16}/></button></article>}
+  </div>
   </div>
   <aside className="map-results" aria-label="Xaritadagi maydonlar"><div className="map-results-heading"><h2>{groupIds?'Guruhdagi maydonlar':'Shu hududda'}</h2><p role="status">{listed.length} ta maydon</p>{groupIds&&<button onClick={()=>setGroupIds(null)}>Hudud roʻyxatiga qaytish</button>}</div>
    {!listed.length&&<div className="map-results-empty"><MapPin size={24}/><p>{venues.length?'Bu hududda mos maydon yoʻq. Xaritani siljiting yoki uzoqlashtiring.':'Filtrlarga mos maydon yoʻq. Sana, vaqt yoki sport turini oʻzgartiring.'}</p>{!!venues.length&&<button onClick={showAll}>Barchasini koʻrsatish</button>}</div>}

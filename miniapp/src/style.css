@@ -40,7 +40,10 @@
 .search-filter-controls{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr);align-items:end;gap:12px}
 .search-filter-controls label{margin:0;gap:7px;min-width:0;line-height:1.4}
 .search-filter-controls input,.search-filter-controls select,.search-filter-controls>button{height:44px;margin:0;line-height:normal;font-size:13px}
-.search-filter-controls input,.search-filter-controls select{display:block;padding:0 14px}
+.search-filter-controls input,.search-filter-controls select{display:block;padding:0 14px;text-align:center}
+.search-filter-controls input[type=date]{display:flex;align-items:center;justify-content:center}
+.search-filter-controls input[type=date]::-webkit-date-and-time-value{margin:0 auto;text-align:center}
+.search-filter-controls input[type=date]::-webkit-datetime-edit{padding:0;text-align:center}
 .search-filter-controls>button{white-space:nowrap}
 .search-filter-controls>button:not(.nearby-filter){grid-column:1/-1;justify-self:start;height:auto;min-height:36px;font-size:12px}
 .chips .sport-icon{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px}
@@ -83,3 +86,11 @@
 
 /* Keep quick times in one scrollable row so results remain visible on mobile. */
 .quick-times{flex-wrap:nowrap;overflow-x:auto}.quick-times button{flex-shrink:0;white-space:nowrap}
+
+.hour-field{display:grid;gap:7px;min-width:0;font-size:12px;font-weight:600}
+.hour-control{display:grid;grid-template-columns:28px minmax(0,1fr) 28px;align-items:center;height:44px;border:1px solid var(--line);background:white}
+.hour-control .hour-wheel{height:100%;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;scroll-snap-type:y mandatory;scrollbar-width:none}
+.hour-wheel::-webkit-scrollbar{display:none}
+.hour-wheel>div{height:100%;display:grid;place-items:center;text-align:center;scroll-snap-align:start;font-size:13px;font-variant-numeric:tabular-nums}
+.search-filter-controls .hour-control button{display:grid;place-items:center;align-self:stretch;min-width:0;min-height:0;padding:0;background:transparent;border:0;color:var(--green)}
+.hour-control button:disabled{opacity:.3}
