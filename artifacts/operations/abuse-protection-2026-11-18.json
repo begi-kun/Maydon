@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-11-18T18:39:46.088132+00:00",
+  "service": "Maydon",
+  "deployment_id": "7190ecce-697b-4ee4-bada-dbd355f1b31e",
+  "deployment_status": "SUCCESS",
+  "backend_tests": 74,
+  "backend_test_failures": 0,
+  "checks": {
+    "database_health": true,
+    "owner_admin_authentication": true,
+    "frontend_compatibility": true,
+    "public_availability": true,
+    "oversized_body_status": 413,
+    "spoofed_forwarding_headers_cannot_bypass_auth_quota": true,
+    "auth_quota_status": 429,
+    "retry_after_and_uzbek_message": true,
+    "retry_after_cors_exposed": true,
+    "guest_reads_during_auth_throttle": true,
+    "railway_edge_trust_enabled": true,
+    "uvicorn_implicit_proxy_parsing_disabled": true,
+    "shared_quota_table_present": true,
+    "separate_network_guest_auth_status": 401
+  },
+  "scope": "No bookings created or modified; no notifications sent. Real Telegram phone journey not verified."
+}

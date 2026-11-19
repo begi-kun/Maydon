@@ -13,7 +13,7 @@ from urllib.parse import parse_qsl
 from contextlib import contextmanager
 from typing import Literal
 from uuid import UUID
-from . import product
+from . import product, protection
 
 import psycopg
 from psycopg.rows import dict_row
@@ -34,7 +34,7 @@ def booking_time_label(value: datetime) -> str:
     return value.astimezone(UZBEKISTAN_TIME).strftime('%d.%m.%Y · %H:%M') + ' (Oʻzbekiston vaqti, UTC+5)'
 
 app = FastAPI(title='MAYDON API', docs_url=None, redoc_url=None)
-app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_credentials=False, allow_methods=['GET','POST'], allow_headers=['Content-Type','X-Telegram-Init-Data'])
+
 
 @contextmanager
 def db():
@@ -67,6 +67,12 @@ def telegram_identity(init_data: str) -> dict:
         return {'id': user_id, 'first_name': str(user.get('first_name', '')), 'username': str(user.get('username', ''))}
     except (KeyError, ValueError, TypeError, json.JSONDecodeError):
         raise HTTPException(401, 'Invalid Telegram authentication')
+
+app.add_middleware(protection.ProtectionMiddleware, db=db, identity=telegram_identity,
+                   configured=lambda: bool(DATABASE_URL))
+app.add_middleware(CORSMiddleware, allow_origins=ORIGINS, allow_credentials=False,
+                   allow_methods=['GET', 'POST'], allow_headers=['Content-Type', 'X-Telegram-Init-Data'],
+                   expose_headers=['Retry-After'])
 
 def authenticate(init_data: str = Header(default='', alias='X-Telegram-Init-Data')) -> int:
     return telegram_identity(init_data)['id']
@@ -273,6 +279,7 @@ def initialize():
     with db() as conn:
         conn.execute(SCHEMA)
         conn.execute(product.SCHEMA)
+        conn.execute(protection.SCHEMA)
 
 @app.get('/health')
 def health():

@@ -270,3 +270,34 @@ Validation: `npm test`, `npm run build`, `npm run test:product` in `miniapp/`;
 backend tests with a disposable `TEST_DATABASE_URL` as above. Browser tests use
 controlled API/Telegram doubles; they do not verify real Telegram delivery.
 Linux browser setup: `npx playwright install --with-deps chromium`.
+
+## API abuse protection
+
+PostgreSQL quotas are shared across API replicas: reads allow 600/minute per
+verified account or network peer; authenticated writes share 60/minute per
+account. Venue submissions/edits additionally allow 10 per 10 minutes. Invalid
+or missing required authentication allows 20/minute per peer. Public discovery
+events have a separate 120/minute peer/account ceiling in addition to their
+existing session quota. Limits use fixed windows starting with the first request.
+Rejected/invalid requests also consume their applicable allowance.
+
+Quota responses return an Uzbek message, HTTP 429 and `Retry-After` seconds,
+exposed to browser clients through CORS. All request bodies are capped at
+7,500,000 bytes before parsing or decoding photos, including chunked requests.
+`/health` and CORS preflight requests bypass quotas. Quota storage failures return
+503; they do not permit unmetered traffic. Expired records are cleaned in bounded
+batches as requests arrive. Backend startup creates the additive quota table;
+application rollback can leave it in place.
+
+Peer limits default to the ASGI socket address. The container disables Uvicorn's
+implicit forwarded-header parsing. Railway production sets `TRUST_RAILWAY_EDGE=true`:
+when `RAILWAY_PROJECT_ID` is also present, the application accepts a single valid
+IP from `X-Real-IP`, falling back to the socket address if missing/invalid.
+`X-Forwarded-For` is never used. Railway's public HTTP edge overwrites client
+forwarding headers ([network specifications](https://docs.railway.com/networking/public-networking/specs-and-limits)).
+Enable this only where public HTTP ingress is the sole untrusted access path:
+private services in the same project/environment are trusted, and the API must
+not expose a raw TCP proxy. On other hosts leave it off and supply an equivalent
+trusted ingress configuration before enabling client-specific guest quotas.
+Account IDs and peer addresses are hashed in the quota table. These limits do not
+replace edge traffic controls.

@@ -48,6 +48,8 @@ class ProductIntegrationTests(unittest.TestCase):
         cls.context.__exit__(None,None,None)
 
     def setUp(self):
+        with main.db() as conn:
+            conn.execute('TRUNCATE request_limits')
         self.flags=patch.dict(os.environ, {'ENABLE_RECURRING_BOOKINGS':'true','ENABLE_AVAILABILITY_ALERTS':'true'})
         self.flags.start();self.addCleanup(self.flags.stop)
         self.owner=headers(8801);self.customer=headers(8802);self.other=headers(8803)

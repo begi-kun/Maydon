@@ -10,12 +10,14 @@ Updated November 12, 2026. Priorities reflect risk to real bookings, then owner/
 - Validation: 34 backend tests passed; frontend build passed; the live checker passed against the existing deployment.
 - Remaining release steps: push the workflow, verify hosted CI, deploy the backend change and rerun the live checker. CI has not yet run on GitHub. Workflow files alone do not enforce branch protection or gate deployments.
 
-## 2. Abuse protection
+## 2. Abuse protection — deployed and live-checked (November 18, 2026)
 
-- Add shared per-account write limits for bookings, venue/photo submissions and owner actions, plus separate public-read and failed-authentication limits.
-- Return 429 with a retry interval and a clear Uzbek message. Do not trust arbitrary forwarded IP headers.
-- Test account isolation, concurrency, expiry and normal calendar usage. Limits must work across replicas.
-- Enforce request-size limits before photo decoding.
+- PostgreSQL quotas share account write limits across replicas, with separate read, failed-authentication, public telemetry and venue-submission budgets.
+- HTTP 429 includes an Uzbek message and a browser-readable retry interval. Application code ignores forwarding headers by default; Railway explicitly trusts its edge X-Real-IP header.
+- All bodies, including chunked uploads, are capped before parsing/photo decoding. Quota storage failures return 503.
+- Validation: all 74 backend tests passed against disposable PostgreSQL, including concurrency, account isolation, expiry, streamed size limits and explicit Railway edge trust.
+- Deployed backend `7190ecce-697b-4ee4-bada-dbd355f1b31e`. Live checks passed for health/database, owner/admin authentication, frontend compatibility, public availability, 413 body rejection and 429 with Uzbek retry guidance/CORS. Changing spoofed forwarding headers did not evade the quota; ordinary guest reads stayed available. Runtime confirmed edge trust, disabled implicit Uvicorn proxy parsing and the shared quota table. Evidence: `artifacts/operations/abuse-protection-2026-11-18.json`.
+- Railway production explicitly trusts its public edge X-Real-IP header; private services in this environment remain within the trust boundary. See README for allowances and rollback. Real Telegram phone journeys and the other operational requirements below remain outstanding.
 
 ## 3. Recovery and monitoring
 
