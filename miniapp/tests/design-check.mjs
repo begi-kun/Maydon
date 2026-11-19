@@ -19,7 +19,10 @@ try {
  const page=await context.newPage();
  await page.route('https://fonts.googleapis.com/**',r=>r.abort());
  await page.route('https://telegram.org/**',r=>r.abort());
- const tomorrow=new Date(Date.now()+86400000).toLocaleDateString('en-CA',{timeZone:'Asia/Tashkent'});
+ // Exercise the morning layout, when all four quick-time options are present.
+ const testNow=new Date(new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Tashkent'})+'T09:00:00+05:00');
+ await page.clock.setFixedTime(testNow);
+ const tomorrow=new Date(testNow.getTime()+86400000).toLocaleDateString('en-CA',{timeZone:'Asia/Tashkent'});
  const start=`${tomorrow}T20:00:00+05:00`;
  let mode='normal',contact=false,searchCount=0,bookingCount=0;
  const venue={id:1,name:'Namangan sport maydoni',sport:'football',address:'Namangan, Davlatobod tumani',price:150000,photos:[],latitude:41,longitude:71,hours:'08:00–23:00',status:'approved',suspended:false};

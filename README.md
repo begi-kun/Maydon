@@ -301,3 +301,15 @@ not expose a raw TCP proxy. On other hosts leave it off and supply an equivalent
 trusted ingress configuration before enabling client-specific guest quotas.
 Account IDs and peer addresses are hashed in the quota table. These limits do not
 replace edge traffic controls.
+
+## Backup recovery verification
+
+A production logical snapshot has been restored into an isolated PostgreSQL 18.6
+cluster and compared table-for-table, including bookings and photo bytes. The
+repeatable tool verifies the source matches the live API, retains a private archive
+in Git-ignored `.backups/`, and never points a restore at production. See
+[RECOVERY_RUNBOOK.md](RECOVERY_RUNBOOK.md) for capture/recheck commands, private
+archive handling, application rollback and the remaining scheduled-backup checks.
+Sanitized evidence is in `artifacts/operations/backup-restore-2026-11-19.json`.
+This drill does not establish a scheduled-backup retention policy or guaranteed
+recovery time.
