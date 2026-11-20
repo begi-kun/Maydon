@@ -6,6 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
 from test_owner_flow import main, TestClient, headers
+from app.migrate import MIGRATIONS
+quota_sql = (MIGRATIONS / "003_protection.sql").read_text()
 from app import protection
 
 
@@ -69,7 +71,7 @@ class BoundaryTests(unittest.TestCase):
 class SharedQuotaTests(unittest.TestCase):
     def setUp(self):
         with main.db() as conn:
-            conn.execute(protection.SCHEMA)
+            conn.execute(quota_sql)
             conn.execute('TRUNCATE request_limits')
 
     def test_concurrent_requests_and_account_isolation(self):

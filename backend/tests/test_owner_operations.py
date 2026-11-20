@@ -3,7 +3,7 @@ import os
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
-from test_owner_flow import main, headers, payload, TestClient
+from test_owner_flow import reset_admin_quota, main, headers, payload, TestClient
 
 class HoursTests(unittest.TestCase):
     def test_boundaries_and_overnight(self):
@@ -29,10 +29,11 @@ class OwnerOperationsTests(unittest.TestCase):
         cls.context.__exit__(None, None, None)
 
     def setUp(self):
+        reset_admin_quota()
         self.owner = headers(7101)
         self.other = headers(7102)
         data = {**payload(), 'hours':'08:00–23:00'}
-        self.venue = self.client.post('/venues', headers=self.owner, json=data).json()['id']
+        self.venue = self.client.post('/venues', headers=headers(999), json={**data, 'owner_telegram_id': 7101}).json()['id']
         self.client.post(f'/admin/venues/{self.venue}/approved', headers=headers(999))
         self.day = (datetime.now(main.UZBEKISTAN_TIME)+timedelta(days=2)).date().isoformat()
         with main.db() as conn:

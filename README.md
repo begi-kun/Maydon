@@ -79,8 +79,7 @@ Bronn button. The website's Telegram sign-in link opens this flow; ordinary
 browser visits remain guests. `/auth/me` verifies Telegram's signed Mini App
 data before displaying an account. Set backend `BOT_USERNAME=maydontopbot`.
 
-Owners use Profile → Maydon egasi paneli (or `/owner` in the bot) to submit
-their pitch. Select a point on the map or use GPS; the selected location is saved automatically,
+Customers see their Telegram ID and booking history in Profile. To list a venue, contact the admin through Profile → @lazyswe ga yozish or the bot’s /support command. The admin opens Profile → Maydon egasi paneli → Maydonlar, creates the venue and assigns the owner’s Telegram ID. Select a point on the map or use GPS; the selected location is saved automatically,
 there are no manual address or coordinate inputs. Address lookup is automatic
 when available; coordinates remain usable if lookup fails. Directions links
 use the saved coordinates.
@@ -307,3 +306,5 @@ archive handling, application rollback and the remaining scheduled-backup checks
 Sanitized evidence is in `artifacts/operations/backup-restore-2026-11-19.json`.
 This drill does not establish a scheduled-backup retention policy or guaranteed
 recovery time.
+
+[Loyiha ofisi, mas’ullar va pilotdan keyingi reja](OFFICE.md)

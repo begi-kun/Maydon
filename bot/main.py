@@ -31,6 +31,11 @@ def database():
 async def start(message: Message):
     url=web_app_url()
     payload=(message.text or '').split(maxsplit=1)
+    if payload[1:] == ['support']:
+        await support(message)
+        return
+    if payload[1:] == ['profile']:
+        url=web_app_url(profile='1')
     if len(payload)==2 and payload[1].startswith('phone_'):
         parts=payload[1][6:].split('_')
         if parts[0].isdigit() and len(parts[0])<=18:
@@ -76,10 +81,18 @@ async def receive_contact(message: Message):
     await message.answer('✓ Telefon raqamingiz saqlandi. Endi bronni davom ettirishingiz mumkin.',reply_markup=ReplyKeyboardRemove())
     await message.answer('Bronnga qaytish:',reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Bronni davom ettirish',web_app=WebAppInfo(url=web_app_url(**params)))]]))
 
+@dp.message(Command('support'))
+async def support(message: Message):
+    if message.chat.type != 'private':
+        return
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
+        text='@lazyswe ga yozish', url='https://t.me/lazyswe')]])
+    await message.answer(f'Maydon qoʻshish uchun @lazyswe ga maydon nomini va Telegram ID raqamingizni yuboring. Sizning ID raqamingiz: {message.from_user.id}', reply_markup=keyboard)
+
 @dp.message(Command('owner'))
 async def owner(message: Message):
-    keyboard=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏟 Maydon qoʻshish / mening maydonlarim',web_app=WebAppInfo(url=web_app_url(owner='1')))]])
-    await message.answer('Oʻz maydoningizni rasmlar va xaritadagi joylashuvi bilan yuboring.',reply_markup=keyboard)
+    keyboard=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏟 Profil va maydonlarim',web_app=WebAppInfo(url=web_app_url(owner='1')))]])
+    await message.answer('Maydon qoʻshish uchun @lazyswe ga murojaat qiling.',reply_markup=keyboard)
     with database() as conn:
         rows=conn.execute('SELECT b.id,v.name,b.start_at,b.customer_phone FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE v.owner_telegram_id=%s AND b.status=%s ORDER BY b.start_at LIMIT 10',(message.from_user.id,'pending')).fetchall()
     if not rows:

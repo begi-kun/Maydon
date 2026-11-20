@@ -3,7 +3,9 @@ import os
 import unittest
 from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
-from test_owner_flow import main, headers, payload
+from test_owner_flow import reset_admin_quota, main, headers, payload
+from app.migrate import MIGRATIONS
+baseline_sql = (MIGRATIONS / "001_main.sql").read_text()
 
 
 class OperationsAccessTests(unittest.TestCase):
@@ -27,9 +29,10 @@ class OperationsIntegrationTests(unittest.TestCase):
         cls.context.__exit__(None,None,None)
 
     def setUp(self):
+        reset_admin_quota()
         self.owner=8101
         self.customer=8102
-        self.venue=self.client.post('/venues',headers=headers(self.owner),json=payload()).json()['id']
+        self.venue=self.client.post('/venues', headers=headers(999), json={**payload(), 'owner_telegram_id': self.owner}).json()['id']
         self.start=(datetime.now(main.UZBEKISTAN_TIME)+timedelta(days=3)).replace(hour=12,minute=0,second=0,microsecond=0)
         with main.db() as conn:
             conn.execute("INSERT INTO telegram_contacts(telegram_id,phone) VALUES (%s,'+998991234567') ON CONFLICT DO NOTHING",(self.customer,))
@@ -127,7 +130,7 @@ class OperationsIntegrationTests(unittest.TestCase):
     def test_timeline_pagination_validation_and_idempotent_schema(self):
         booking=self.book()
         with main.db() as conn:
-            conn.execute(main.SCHEMA)
+            conn.execute(baseline_sql)
             for i in range(51):
                 conn.execute("INSERT INTO owner_payment_events(booking_id,owner_id,payment_status) VALUES (%s,%s,'paid')",(booking,self.owner))
         first=self.get(f'/admin/bookings/{booking}')['timeline']

@@ -118,6 +118,7 @@ export function OwnerForm({onSaved,onExpired,initial,onCancel}:{onSaved:()=>void
  }
  if(saved)return <div className="setting" role="status"><h4>✓ Ariza yuborildi</h4><p>Maydoningiz va rasmlaringiz admin tekshiruvida. Tasdiqlangandan keyin ommaga koʻrinadi.</p><button onClick={()=>{setSaved(false);setPhotos([]);setLocation(null)}}>Yana maydon qoʻshish</button></div>;
  return <form onSubmit={submit} noValidate><fieldset disabled={busy}><h4>{initial?'Maydonni tahrirlash':'Yangi maydon qoʻshish'}</h4>{initial&&<><p>Oʻzgarishlar admin tekshiruviga yuboriladi. Mavjud bronlar saqlanadi.</p><button type="button" className="back" onClick={onCancel}>Tahrirni bekor qilish</button></>}
+  {!initial&&<label>Maydon egasining Telegram ID raqami<input name="owner_telegram_id" inputMode="numeric" pattern="[1-9][0-9]*" required/></label>}
   <label>Maydon nomi<input name="name" defaultValue={initial?.name} required minLength={2} maxLength={120}/></label>
   <label>Sport<select name="sport" defaultValue={initial?.sport||'football'}><option value="football">Futbol</option><option value="table_tennis">Stol tennisi</option><option value="billiards">Bilyard</option></select></label>
   <label>Bir soat narxi (soʻm)<input name="price" defaultValue={initial?.price} type="number" min={0} max={100000000} step={1} required/></label>

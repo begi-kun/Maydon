@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from unittest.mock import patch
 from uuid import uuid4
-from test_owner_flow import main, headers, payload, TestClient
+from test_owner_flow import reset_admin_quota, main, headers, payload, TestClient
 from availability_alerts import queue_availability_alerts, subscription_is_current, slot_is_open
 from reminders import pending_notifications
 
@@ -48,12 +48,13 @@ class ProductIntegrationTests(unittest.TestCase):
         cls.context.__exit__(None,None,None)
 
     def setUp(self):
+        reset_admin_quota()
         with main.db() as conn:
             conn.execute('TRUNCATE request_limits')
         self.flags=patch.dict(os.environ, {'ENABLE_RECURRING_BOOKINGS':'true','ENABLE_AVAILABILITY_ALERTS':'true'})
         self.flags.start();self.addCleanup(self.flags.stop)
         self.owner=headers(8801);self.customer=headers(8802);self.other=headers(8803)
-        self.venue=self.client.post('/venues',headers=self.owner,json={**payload(),'hours':'08:00–23:00'}).json()['id']
+        self.venue=self.client.post('/venues', headers=headers(999), json={**payload(), 'hours':'08:00–23:00', 'owner_telegram_id': 8801}).json()['id']
         self.client.post(f'/admin/venues/{self.venue}/approved',headers=headers(999))
         self.day=(datetime.now(main.UZBEKISTAN_TIME)+timedelta(days=2)).date()
         with main.db() as conn:
