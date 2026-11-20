@@ -106,7 +106,7 @@ try {
  await home('?owner=1');
  await page.getByRole('heading',{name:'Profil',exact:true}).waitFor();
  await page.getByText('Telegram ID · 101',{exact:true}).waitFor();
- await page.getByRole('button',{name:/@lazyswe ga yozish/}).waitFor();
+ await page.getByRole('button',{name:/Qo'llab quvvatlash bilan aloqa/}).waitFor();
  assert.equal(await page.getByRole('button',{name:/Maydon egasi paneli/}).count(),0);
  assert.equal(await page.locator('.owner-workspace').count(),0);
  mode='normal';
