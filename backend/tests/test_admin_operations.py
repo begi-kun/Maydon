@@ -4,6 +4,8 @@ import unittest
 from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 from test_owner_flow import reset_admin_quota, main, headers, payload
+from app.migrate import MIGRATIONS
+baseline_sql = (MIGRATIONS / "001_main.sql").read_text()
 
 
 class OperationsAccessTests(unittest.TestCase):
@@ -128,7 +130,7 @@ class OperationsIntegrationTests(unittest.TestCase):
     def test_timeline_pagination_validation_and_idempotent_schema(self):
         booking=self.book()
         with main.db() as conn:
-            conn.execute(main.SCHEMA)
+            conn.execute(baseline_sql)
             for i in range(51):
                 conn.execute("INSERT INTO owner_payment_events(booking_id,owner_id,payment_status) VALUES (%s,%s,'paid')",(booking,self.owner))
         first=self.get(f'/admin/bookings/{booking}')['timeline']

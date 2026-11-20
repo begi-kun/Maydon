@@ -34,3 +34,35 @@ Har vazifa uchun “Maydon ofisi vazifasi” shablonidan foydalaniladi. Bajaruvc
 ## 20-noyabr tekshiruvlari
 
 Mini App’da 4 test va production build o‘tdi. Live tekshiruv API va baza holati, owner/admin endpointlarining autentifikatsiya talabi va frontendning API bilan mosligini tasdiqladi. Ushbu tekshiruvda haqiqiy Telegram broni bajarilmadi. Hosted CI, snapshot jadvali va tashqi ogohlantirishning navbatchiga yetib borishi ochiq.
+
+## Qolgan ishlar — 20-noyabr
+
+Muddatlar pilot boshlangan kunga nisbatan berilgan. Rahbar pilot sanasini, har bir rol uchun odamni va navbatchining o‘rinbosarini belgilaydi. GitHub Issues’da vazifani dalil bilan yopish uchun ofis shablonidan foydalaniladi.
+
+### Pilot va ommaviy targ‘ibotdan oldin
+
+- [ ] **QA va admin.** Haqiqiy telefonda mijoz, ega va admin bilan supportdan boshlab maydon biriktirishgacha sinang. Bron, tasdiq, rad etish, bekor qilish, eslatma, bir vaqtga ikki so‘rov, boshqa akkauntga tegishli ma’lumot va muddati tugagan sessiyani tekshiring. Natijani har ssenariy uchun qayd eting.
+- [ ] **Mobil QA.** Telegram kontakt oynasi, botdan ayni maydon va vaqtga qaytish, klaviatura, ekran chetlari va VoiceOver/TalkBack orqali bronni yakunlashni qurilmada tekshiring.
+- [ ] **Infratuzilma navbatchisi.** Railway snapshot jadvali, saqlash muddati va saqlash joyini yozing. Mavjud rejali snapshotni alohida bazaga tiklang. Qaysi vaqtgacha ma’lumot tiklangani, sarflangan vaqt va javobgar ismni qayd eting.
+- [x] **Backend muhandisi.** Uchta boshlang‘ich SQL migratsiyasi versiyalandi. Oldingi relizning sxema amallari o‘zgarishsiz ko‘chirildi. Alohida PostgreSQL bazasida avvalgi sxemadan yangilash, qayta ishga tushirish va saqlangan profilni o‘qish tekshirildi. 75 backend testi o‘tdi.
+- [ ] **Bot muhandisi va navbatchi.** Health monitoring hamda kechikkan yoki yetkazilmagan xabarlar uchun sinov ogohlantirishlarini oling. Qabul qiluvchi, javob berish tartibi va navbat normallashgan vaqtni qayd eting.
+- [ ] **Repo administratori.** Asosiy branchda backend va frontend CI majburiyligini tekshiring. GitHub API main uchun frontend va backend majburiyligini tasdiqladi. Muvaffaqiyatsiz PR bloklanishi bo‘yicha dalilni qayd eting.
+- [ ] **Mini App muhandisi.** Xarita kalitining ruxsat etilgan production domeni va kvotasini provayder panelida tekshiring. Ishlaydigan production xaritasi va kvota nazoratini qayd eting.
+- [ ] **Support mas’uli.** Admin aloqasini haqiqiy mijozdan sinang. Telegram ID, telefon, surat va bron ma’lumotidan foydalanish, saqlash muddati va o‘chirish tartibini kelishing. Mijozga support, bekor qilish va to‘lov holati qoidalarini ko‘rsating. Sinov murojaatini boshidan oxirigacha yoping.
+
+### Pilot, o‘sish va har relizdagi ishlar
+
+- [ ] **Pilot rahbari, D0.** Egalar roziligi bilan 5–10 maydonni tanlang, dastlabki uch egaga jadval va oflayn bron kiritishni ko‘rsating. Boshlang‘ich noyob akkauntlar soni va test hisoblari istisnolarini qayd eting.
+- [ ] **Ega va support, har kuni.** Bo‘sh soatlar, javobsiz so‘rov, oflayn bron, jadval xatosi va seans natijalarini solishtiring. Birinchi sutkadagi har bir maydon natijasini yozing.
+- [ ] **Rahbar, 14-kun.** Pilot hisobotida qidiruvdan bronga o‘tish, javob vaqti, bekor qilish, kelmay qolish va ikkinchi hafta qaytishini baholang. Yetishmayotgan qaydlarni ko‘rsating. Kengaytirish, uzaytirish yoki tuzatish qarorini yozing.
+- [ ] **Muhandislar va navbatchi, 15–30-kun.** Pilotdagi asosiy nosozliklarni yoping, natijalarni qayta o‘lchang va tiklash mashqini takrorlang.
+- [ ] **O‘sish mas’uli, 1–6-hafta.** Egalar, jamoa sardorlari va moderator roziligidagi guruhlar orqali 1 000 yangi noyob foydalanuvchini maqsad qiling. Har juma haqiqiy natijani haftalik marralar bilan solishtiring. Kanal rejasi va yuboriladigan matnlar [pilot PDFida](artifacts/pilot/Bronn-1000.pdf).
+- [ ] **Reliz mas’uli, har chiqarishda.** Alohida bazada backend testlari, frontend test/build, sxema mosligi, deploy tartibi, aynan bitta bot worker, startup loglari, jonli tekshiruv va o‘zgargan Telegram oqimlarini qayd eting.
+
+### Pilot natijasiga bog‘liq mahsulot qarorlari
+
+- [ ] **Mahsulot rahbari va QA, 14-kundan keyin.** Tayyor takroriy qo‘lda bron va bo‘sh vaqt xabarnomasini alohida baholang. Tanlangan funksiyada bayroqni yoqish, sinash va qaytarish natijasini yozing. Xabarnoma uchun API va bot sozlamalari mos bo‘lsin.
+- [ ] **Ega bilan ishlovchi muhandis.** Takroriy vaqt bloklari va ko‘p soatli bron uchun kesishuv, tundan o‘tish va qisman bekor qilish qoidalarini kelishing. Egalar o‘rtasida ma’lumot ajratilishi va jadval formulalaridan himoyalangan bron/to‘lov eksportini sinang.
+- [ ] **Mahsulot rahbari.** Saralangan maydonlar va qidiruv yaxshilanishlarini pilotdagi so‘rovlar asosida ustuvorlashtiring. “O‘yinchi kerak” tajribasi uchun yopiq guruh, sardor, e’lon muddati va tasdiq tartibini belgilang.
+- [ ] **To‘lov mas’uli.** Kelmay qolishlar o‘lchovidan keyin provayder va merchant shartlarini baholang. Qaror ijobiy bo‘lsa, imzolangan callback, takroriy hodisa, summa/valyuta tekshiruvi, qaytarish va hisoblarni solishtirish sinovlarini bajaring.
+- [ ] **Rahbar.** A’zolik, turnir, reyting va xodim rollari bo‘yicha talablar va muvaffaqiyat mezonini pilotdan keyin belgilang. Har biri uchun alohida boshlash yoki kechiktirish qarorini yozing.
