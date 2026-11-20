@@ -85,18 +85,14 @@ async def receive_contact(message: Message):
 async def support(message: Message):
     if message.chat.type != 'private':
         return
-    admin_id = os.getenv('ADMIN_TELEGRAM_ID', '')
-    if not admin_id.isdigit():
-        await message.answer('Support aloqasi hozircha sozlanmagan.')
-        return
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
-        text='Adminga yozish', url=f'tg://user?id={admin_id}')]])
-    await message.answer(f'Maydon qoʻshish uchun adminga maydon nomini va Telegram ID raqamingizni yuboring. Sizning ID raqamingiz: {message.from_user.id}', reply_markup=keyboard)
+        text='@lazyswe ga yozish', url='https://t.me/lazyswe')]])
+    await message.answer(f'Maydon qoʻshish uchun @lazyswe ga maydon nomini va Telegram ID raqamingizni yuboring. Sizning ID raqamingiz: {message.from_user.id}', reply_markup=keyboard)
 
 @dp.message(Command('owner'))
 async def owner(message: Message):
     keyboard=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏟 Profil va maydonlarim',web_app=WebAppInfo(url=web_app_url(owner='1')))]])
-    await message.answer('Maydon qoʻshish uchun /support orqali adminga murojaat qiling.',reply_markup=keyboard)
+    await message.answer('Maydon qoʻshish uchun @lazyswe ga murojaat qiling.',reply_markup=keyboard)
     with database() as conn:
         rows=conn.execute('SELECT b.id,v.name,b.start_at,b.customer_phone FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE v.owner_telegram_id=%s AND b.status=%s ORDER BY b.start_at LIMIT 10',(message.from_user.id,'pending')).fetchall()
     if not rows:
