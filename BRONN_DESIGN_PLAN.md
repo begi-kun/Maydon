@@ -1,8 +1,8 @@
-# MAYDON — alohida dizayn rejasi
+# Bronn — alohida dizayn rejasi
 
 Sana: 2026-11-15. Holat: dizayn kodi va avtomatik qabul tekshiruvlari bajarildi; frontend Railwayga chiqarildi; haqiqiy telefon tekshiruvi hali tasdiqlanmagan.
 
-Maqsad: telefonda sport va kerakli vaqtni tez tanlash, mos maydonni baholash va bron holatini tushunishni yengillashtirish. To‘q yashil/lime ranglar, MAYDON brendi va mavjud funksiyalar saqlanadi.
+Maqsad: telefonda sport va kerakli vaqtni tez tanlash, mos maydonni baholash va bron holatini tushunishni yengillashtirish. To‘q yashil/lime ranglar, Bronn brendi va mavjud funksiyalar saqlanadi.
 
 ## 1. Mobil bosh sahifa
 
@@ -64,7 +64,7 @@ Maqsad: telefonda sport va kerakli vaqtni tez tanlash, mos maydonni baholash va 
 - Qidiruv yangilanganda noto‘g‘ri bo‘sh vaqt yoki eski natija tasdiqlangan deb ko‘rsatilmaydi.
 - Frontend build o‘tadi; mobil va desktop ko‘rinishlari skrinshot orqali solishtiriladi.
 
-Mahsulot ustuvorliklari va pilot: MAYDON_PRODUCT_PLAN.md. Haftalik bron, kutish ro‘yxati va to‘lov integratsiyasi ushbu dizayn iteratsiyasining doirasiga kirmaydi.
+Mahsulot ustuvorliklari va pilot: BRONN_PRODUCT_PLAN.md. Haftalik bron, kutish ro‘yxati va to‘lov integratsiyasi ushbu dizayn iteratsiyasining doirasiga kirmaydi.
 
 ## Bajarilgan ishlar — 2026-11-15
 

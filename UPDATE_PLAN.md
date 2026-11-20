@@ -1,4 +1,4 @@
-# MAYDON next updates
+# Bronn next updates
 
 Updated November 12, 2026. Priorities reflect risk to real bookings, then owner/customer value.
 

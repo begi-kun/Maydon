@@ -1,4 +1,4 @@
-# MAYDON — Hudle tajribasidan foydalanish rejasi
+# Bronn — Hudle tajribasidan foydalanish rejasi
 
 Sana: 2026-11-15. Maqsad: Namanganda kerakli vaqtga maydon topish va ishonchli bron qilishni soddalashtirish.
 

@@ -1,4 +1,4 @@
-"""MAYDON long-polling Telegram worker. Deploy as ONE persistent worker."""
+"""Bronn long-polling Telegram worker. Deploy as ONE persistent worker."""
 import asyncio
 import logging
 import os
@@ -47,8 +47,8 @@ async def start(message: Message):
             if len(parts)==2 and parts[1].isdigit():
                 arguments['slot']=parts[1]
             url=web_app_url(**arguments)
-    keyboard=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏟 MAYDONni ochish',web_app=WebAppInfo(url=url))]])
-    await message.answer('MAYDON — Namangan shahridagi futbol, stol tennisi va bilyard joylari.',reply_markup=keyboard)
+    keyboard=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='🏟 Bronnni ochish',web_app=WebAppInfo(url=url))]])
+    await message.answer('Bronn — Namangan shahridagi futbol, stol tennisi va bilyard joylari.',reply_markup=keyboard)
 
 @dp.message(Command('phone'))
 async def request_phone(message: Message):
@@ -74,7 +74,7 @@ async def receive_contact(message: Message):
         params={'venue':str(target['venue_id'])}
         if target['slot']:params['slot']=str(target['slot'])
     await message.answer('✓ Telefon raqamingiz saqlandi. Endi bronni davom ettirishingiz mumkin.',reply_markup=ReplyKeyboardRemove())
-    await message.answer('MAYDONga qaytish:',reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Bronni davom ettirish',web_app=WebAppInfo(url=web_app_url(**params)))]]))
+    await message.answer('Bronnga qaytish:',reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Bronni davom ettirish',web_app=WebAppInfo(url=web_app_url(**params)))]]))
 
 @dp.message(Command('owner'))
 async def owner(message: Message):
@@ -164,7 +164,7 @@ async def main():
     for name in ('BOT_TOKEN','DATABASE_URL','MINI_APP_URL'):
         if not os.getenv(name):raise RuntimeError(f'Missing {name}')
     bot=Bot(os.environ['BOT_TOKEN'])
-    await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text='MAYDONni ochish',web_app=WebAppInfo(url=web_app_url())))
+    await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text='Bronnni ochish',web_app=WebAppInfo(url=web_app_url())))
     worker=asyncio.create_task(deliver_notifications(bot))
     try:
         await dp.start_polling(bot)

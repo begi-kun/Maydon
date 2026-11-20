@@ -1,4 +1,4 @@
-# MAYDON — deployment handoff (November 5, 2026)
+# Bronn — deployment handoff (November 5, 2026)
 
 > Historical handoff. See [README.md](README.md), [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md) and [UPDATE_PLAN.md](UPDATE_PLAN.md) for current deployment status. Statements below describe November 5.
 
@@ -20,7 +20,7 @@
 3. Create Render Web Service from GitHub. Root directory `backend`; runtime Docker (uses `backend/Dockerfile`). Set `BOT_TOKEN`, `DATABASE_URL`, `ADMIN_TELEGRAM_ID`, `CORS_ORIGINS=https://maydon-bot.vercel.app`. Set health check path `/health`. Wait for `/health` to return `{ "status": "ok" }`.
 4. In Vercel project set Root Directory `miniapp`, framework Vite, build `npm run build`, output `dist`. Set `VITE_API_URL=https://YOUR-API.onrender.com`, `VITE_YANDEX_MAPS_KEY=YOUR_PUBLIC_MAPS_KEY`. Redeploy. Never place BOT_TOKEN or DATABASE_URL in Vercel's VITE_ variables.
 5. Create a Render **Background Worker** from the same repository, root directory `bot`, Docker runtime (uses `bot/Dockerfile`). Set `BOT_TOKEN`, `DATABASE_URL`, `MINI_APP_URL=https://maydon-bot.vercel.app`, `ADMIN_TELEGRAM_ID`. Start **one** worker only; webhook and polling must not both run.
-6. In BotFather configure menu button `Open MAYDON` to `https://maydon-bot.vercel.app/`.
+6. In BotFather configure menu button `Open Bronn` to `https://maydon-bot.vercel.app/`.
 7. Open Mini App from Telegram, not Chrome, to test authenticated features. Admin creates/approves venue through the owner form or `/admin`; owner must open the bot and run `/owner` to review booking requests.
 
 ## Launch acceptance checks (must pass before accepting real bookings)

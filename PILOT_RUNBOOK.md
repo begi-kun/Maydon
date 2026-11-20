@@ -1,4 +1,4 @@
-# MAYDON pilotini olib borish
+# Bronn pilotini olib borish
 
 2026-11-15. Bu hujjat tayyorlangan koddan foydalanish tartibi; pilot o‘tkazilgani yoki production tayyorligi haqidagi hisobot emas.
 
