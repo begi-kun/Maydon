@@ -52,7 +52,7 @@ function App(){
  const productFeatures=useProductFeatures();
  const mainRef=useRef<HTMLElement>(null);const navRef=useRef<HTMLElement>(null);
  useEffect(()=>{const nav=navRef.current;if(!nav)return;const resize=new ResizeObserver(()=>document.documentElement.style.setProperty('--nav-height',`${nav.getBoundingClientRect().height}px`));resize.observe(nav);return()=>resize.disconnect()},[]);
- const [tab,setTab]=useState<Tab>(new URLSearchParams(window.location.search).has('owner')?'owner':'home');
+ const [tab,setTab]=useState<Tab>(() => { const params=new URLSearchParams(window.location.search); return params.has('admin')?'admin':params.has('owner')?'owner':'home' });
  const [initialDiscovery]=useState(()=>readDiscovery(window.location.search));
  const [sport,setSport]=useState(initialDiscovery.sport);const [query,setQuery]=useState(initialDiscovery.query);const [venues,setVenues]=useState<Venue[]>([]);
  const [selected,setSelected]=useState<Venue|null>(null);const [availabilityRevision,setAvailabilityRevision]=useState(0);const [message,setMessage]=useState('');
@@ -94,7 +94,13 @@ function App(){
  async function loadBookings(){if(!initData())return;try{const r=await fetch(`${API}/bookings/me`,{headers:authHeaders()});if(!r.ok)throw Error();setMyBookings(await r.json())}catch{setMessage('Bronlarni yuklab boʻlmadi.')}}
 
  useEffect(()=>{mainRef.current?.focus({preventScroll:true})},[tab,selected?.id]);
- function navigate(next:Tab){setTab(next);setSelected(null);if(next==='bookings')loadBookings();window.scrollTo({top:0,behavior:'smooth'})}
+ function navigate(next:Tab){
+  const url=new URL(window.location.href);
+  url.searchParams.delete('owner');
+  url.searchParams.delete('admin');
+  if(next==='owner'||next==='admin')url.searchParams.set(next,'1');
+  window.history.replaceState(null,'',url);
+  setTab(next);setSelected(null);if(next==='bookings')loadBookings();window.scrollTo({top:0,behavior:'smooth'})}
  async function decide(path:string,refresh:()=>void){try{const r=await fetch(`${API}${path}`,{method:'POST',headers:authHeaders()});if(!r.ok)throw Error();setAvailabilityRevision(n=>n+1);refresh()}catch{setMessage('Amal bajarilmadi. Qayta urinib koʻring.')}}
  async function book(time:string){
   if(!selected||!time)return;if(!verifiedUser){navigate('profile');return;}
@@ -154,11 +160,11 @@ function App(){
   {tab==='bookings'&&<>{verifiedUser&&productFeatures.availability_alerts&&<AvailabilitySubscriptions/>}{pageTitle('SIZNING OʻYINLARINGIZ','Bronlarim','Rejalashtirilgan oʻyinlar va soʻrovlaringiz shu yerda.')}<button className="back" onClick={loadBookings}><RefreshCw size={15}/> Yangilash</button>{!verifiedUser?loginPanel:myBookings.length?<div className="booking-list">{myBookings.map(b=><article className="booking-card" key={b.id}><button className="booking-venue-link" aria-label={`${b.venue_name} maydonini ochish`} onClick={()=>openBookedVenue(b)}/><div className="date-tile"><span>{new Date(b.start_at).toLocaleDateString('uz-UZ',{month:'short',timeZone:'Asia/Tashkent'})}</span><strong>{new Date(b.start_at).toLocaleDateString('uz-UZ',{day:'numeric',timeZone:'Asia/Tashkent'})}</strong></div><div className="booking-card-body"><Status value={b.status}/><h3>{b.venue_name}</h3><p><Clock3 size={14}/>{new Date(b.start_at).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tashkent'})} · 1 soat</p></div>{b.status==='pending'&&<button className="text-danger" onClick={()=>decide(`/bookings/${b.id}/cancel`,loadBookings)}>Bekor qilish</button>}</article>)}</div>:<Empty title="Keyingi oʻyiningiz hali oldinda" action={<button className="primary compact" onClick={()=>navigate('explore')}>Maydon topish <ArrowRight size={16}/></button>}>Maydon tanlang va birinchi bron soʻrovingizni yuboring.</Empty>}</>}
   {tab==='profile'&&<>{pageTitle('SHAXSIY KABINET','Profil','Hisobingiz, maydonlaringiz va barcha bronlaringiz.')}{!verifiedUser?loginPanel:<><div className="profile-card"><div className="avatar">{verifiedUser.first_name.slice(0,1)}</div><div><h2>{verifiedUser.first_name}</h2><p><ShieldCheck size={15}/> Telegram hisobi tasdiqlangan</p></div></div><div className="profile-links"><button onClick={()=>navigate('owner')}><span className="menu-icon"><Goal/></span><span><strong>Maydon egasi paneli</strong><small>Maydon qoʻshish va bronlarni boshqarish</small></span><ArrowUpRight/></button><button onClick={()=>navigate('bookings')}><span className="menu-icon"><CalendarDays/></span><span><strong>Bronlar tarixi</strong><small>Oʻyinlaringiz va bron holati</small></span><ArrowUpRight/></button>{isAdmin&&<button onClick={()=>navigate('admin')}><span className="menu-icon"><ShieldCheck/></span><span><strong>Admin paneli</strong><small>Maydonlar, arizalar va bronlarni boshqarish</small></span><ArrowUpRight/></button>}</div></>}</>}
   {tab==='owner'&&<><button className="back" onClick={()=>navigate('profile')}><ArrowLeft size={16}/> Profil</button>{!verifiedUser?loginPanel:<OwnerPanel onExpired={()=>{setVerifiedUser(null);setIsAdmin(false)}} onChange={loadVenues}/>}</>}
-  {tab==='admin'&&isAdmin&&<><button className="back" onClick={()=>navigate('profile')}><ArrowLeft size={16}/> Profil</button><AdminPanel onChanged={loadVenues}/></>}
+  {tab==='admin'&&<><button className="back" onClick={()=>navigate('profile')}><ArrowLeft size={16}/> Profil</button>{!verifiedUser?loginPanel:isAdmin?<AdminPanel onChanged={loadVenues}/>:<p role="alert">Bu panelga kirish uchun admin huquqi kerak.</p>}</>}
   </>}
   <footer className="site-footer"><span>Bronn.</span><p>Yaxshi oʻyin — yaxshi maydondan.</p><small>Namangan, Oʻzbekiston</small></footer>
   </main>
-  <nav ref={navRef} className="bottom-nav" aria-label="Asosiy menyu">{([['home',House,'Bosh sahifa'],['explore',Compass,'Qidiruv'],['map',MapPin,'Xarita'],['bookings',CalendarDays,'Bronlar'],['profile',UserRound,'Profil']] as const).map(([id,Icon,label])=><button key={id} className={tab===id||(id==='profile'&&(tab==='owner'||tab==='admin'))?'on':''} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={21}/><span>{label}</span></button>)}</nav>
+  <nav hidden={tab==='admin'||tab==='owner'} style={tab==='admin'||tab==='owner'?{display:'none'}:undefined} ref={navRef} className="bottom-nav" aria-label="Asosiy menyu">{([['home',House,'Bosh sahifa'],['explore',Compass,'Qidiruv'],['map',MapPin,'Xarita'],['bookings',CalendarDays,'Bronlar'],['profile',UserRound,'Profil']] as const).map(([id,Icon,label])=><button key={id} className={tab===id||(id==='profile'&&(tab==='owner'||tab==='admin'))?'on':''} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={21}/><span>{label}</span></button>)}</nav>
  </div>
 }
 createRoot(document.getElementById('root')!).render(<App/>);
