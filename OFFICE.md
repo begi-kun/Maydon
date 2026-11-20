@@ -66,3 +66,7 @@ Muddatlar pilot boshlangan kunga nisbatan berilgan. Rahbar pilot sanasini, har b
 - [ ] **Mahsulot rahbari.** Saralangan maydonlar va qidiruv yaxshilanishlarini pilotdagi so‘rovlar asosida ustuvorlashtiring. “O‘yinchi kerak” tajribasi uchun yopiq guruh, sardor, e’lon muddati va tasdiq tartibini belgilang.
 - [ ] **To‘lov mas’uli.** Kelmay qolishlar o‘lchovidan keyin provayder va merchant shartlarini baholang. Qaror ijobiy bo‘lsa, imzolangan callback, takroriy hodisa, summa/valyuta tekshiruvi, qaytarish va hisoblarni solishtirish sinovlarini bajaring.
 - [ ] **Rahbar.** A’zolik, turnir, reyting va xodim rollari bo‘yicha talablar va muvaffaqiyat mezonini pilotdan keyin belgilang. Har biri uchun alohida boshlash yoki kechiktirish qarorini yozing.
+
+### 20-noyabr, production tekshiruvi
+
+PR 22 orqali versiyalangan migratsiyalar va xabar navbati monitoringi productionga chiqdi. GitHub backend/frontend tekshiruvlari va jonli health, navbat hamda dizayn tekshiruvi o‘tdi. Railway PostgreSQL uchun backup jadvali va mavjud volume snapshotlari soni nol. Navbatchiga ogohlantirish yetganini tasdiqlash va rejali backupdan tiklash ochiq.
