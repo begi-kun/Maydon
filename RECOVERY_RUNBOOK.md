@@ -84,3 +84,7 @@ snapshot and queued/already-delivered notifications before switching services.
 Restart exactly one bot worker only after notification reconciliation, then verify
 health, booking availability and real account journeys. Replacing production
 requires a separate explicit recovery instruction; the drill grants no such action.
+
+## 2026-11-20 production volume audit
+
+A read-only Railway API query for the production PostgreSQL volume returned zero backup schedules and zero volume snapshots. No scheduled snapshot exists to restore. The November 19 logical backup drill remains the latest verified recovery evidence. To complete the scheduled recovery item, configure a schedule with an agreed retention and storage budget, wait for a successful snapshot, then verify a restore without switching the live database. Record the snapshot timestamp, restored data point, elapsed time and response owner.
