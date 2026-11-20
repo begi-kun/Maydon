@@ -33,7 +33,7 @@ try {
   const url=new URL(route.request().url()),path=url.pathname;
   const json=data=>route.fulfill({json:data});
   if(path==='/auth/config')return json({bot_username:'maydon_test_bot'});
-  if(path==='/auth/me')return json({id:101,first_name:'Test egasi',owner:true,admin:false});
+  if(path==='/auth/me')return json({id:101,first_name:'Test egasi',owner:mode!=='customer',admin:false});
   if(path==='/auth/contact')return json({phone:contact?'+998900000001':null});
   if(path==='/owner/venues')return json([venue]);
   if(path==='/owner/overview')return json({today:1,pending:1,value:150000,unpaid:1});
@@ -94,6 +94,14 @@ try {
  await home(`?venue=1&slot=${Date.parse(start)/1000}`);await page.locator('.booking-summary').waitFor();mode='conflict';await page.getByRole('button',{name:'Bron soʻrovi yuborish',exact:true}).click();await page.getByText('Bu vaqt hozirgina band qilindi.',{exact:false}).waitFor();await page.locator('.time-grid button.booked').first().waitFor();assert.equal(await page.locator('.booking-summary').count(),0);await audit('booking-conflict');
  for(const state of ['empty','error','long','slow','search-error','photo-error']){mode=state;await home(state==='search-error'?`?day=${tomorrow}&time=20:00`:'');if(state==='slow'){await page.getByRole('status',{name:'Yuklanmoqda',exact:true}).waitFor();await shot('loading-390');await page.locator('.venue-card').waitFor()}else if(state==='empty')await page.getByRole('heading',{name:'Birinchi maydonni kutyapmiz'}).waitFor();else if(state==='error')await page.getByRole('heading',{name:'Maydonlar yuklanmadi'}).waitFor();else if(state==='search-error')await page.getByRole('heading',{name:'Vaqtlarni tekshirib boʻlmadi'}).waitFor();else if(state==='photo-error')await page.getByText('Rasm mavjud emas',{exact:true}).waitFor();else await page.locator('.sport-placeholder').waitFor();await noOverflow();await audit(state);await shot(`${state}-390`)}
  mode='gallery';await home('?venue=1');await page.locator('.detail-gallery img').nth(1).waitFor();await page.getByRole('group',{name:'Maydon rasmlari — yon tomonga suring'}).focus();await audit('gallery-scroll');await shot('gallery-390');mode='normal';await home();await page.locator('.venue-card').waitFor();await page.addStyleTag({content:'html{font-size:200%} button,input,select,p,h1,h2,h3,span,label{font-size:1rem!important}'});await noOverflow();await shot('text-large-390');
+ mode='customer';
+ await home('?owner=1');
+ await page.getByRole('heading',{name:'Profil',exact:true}).waitFor();
+ await page.getByText('Telegram ID · 101',{exact:true}).waitFor();
+ await page.getByRole('button',{name:/Supportga murojaat/}).waitFor();
+ assert.equal(await page.getByRole('button',{name:/Maydon egasi paneli/}).count(),0);
+ assert.equal(await page.locator('.owner-workspace').count(),0);
+ mode='normal';
  await home('?owner=1');await page.getByRole('heading',{name:'Maydon egasi paneli'}).waitFor();await page.locator('.owner-slot').waitFor();for(const width of [360,430,1280,390]){await page.setViewportSize({width,height:844});await noOverflow()}await audit('owner-schedule');await shot('owner-390');await page.getByRole('button',{name:/Yangi soʻrovlar/}).click();await page.getByRole('button',{name:'Tasdiqlash',exact:true}).waitFor();assert.equal(await page.locator('select[name=status]').inputValue(),'pending');await audit('owner-pending');await shot('owner-pending-390');await page.getByRole('button',{name:'Tasdiqlash',exact:true}).click();
  await page.getByText('Bu filtrlar boʻyicha bronlar topilmadi.').waitFor();assert.equal(ownerDecision,'confirmed');
  await page.getByRole('button',{name:'Jadval',exact:true}).click();await page.getByRole('button',{name:'Vaqtni yopish',exact:true}).click();await page.locator('.owner-slot').click();assert.equal(await page.locator('.owner-slot-editor select').inputValue(),'block');await page.locator('.owner-slot-editor input[name=reason]').fill('Test yopish');await audit('owner-block-editor');await shot('owner-block-390');await page.locator('.owner-slot-editor .primary').click();await page.getByText('Vaqt yopildi.',{exact:true}).waitFor();assert.equal(ownerBookings.at(-1).path,'/owner/blocks');
