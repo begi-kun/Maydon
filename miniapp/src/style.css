@@ -81,7 +81,7 @@
 
 @media(min-width:901px){.bottom-nav button.on{color:var(--green)}}
 
-.booking-card{position:relative}.booking-venue-link{position:absolute;inset:0;width:100%;height:100%;border-radius:var(--radius);background:transparent}.booking-venue-link:hover{background:#153e2e05}.booking-card>.text-danger{position:relative;z-index:1}
+.booking-card{position:relative}.booking-disclosure{flex:1 1 100%;min-width:0}.booking-disclosure summary{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none}.booking-disclosure summary::-webkit-details-marker{display:none}.booking-chevron{margin-left:auto}.booking-disclosure[open] .booking-chevron{transform:rotate(180deg)}.booking-facts{border-top:1px solid var(--line);margin-top:14px;padding-top:12px;font-size:14px}.booking-card>.text-danger{position:relative;z-index:1}
 
 /* Keep quick times in one scrollable row so results remain visible on mobile. */
 .quick-times{flex-wrap:nowrap;overflow-x:auto}.quick-times button{flex-shrink:0;white-space:nowrap}
@@ -197,6 +197,18 @@ h1, h2, h3, h4 { letter-spacing: -.035em; }
   border-color: transparent;
   border-radius: 11px;
 }
+.welcome-compact + .chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 440px;
+}
+.welcome-compact + .chips button {
+  justify-content: center;
+  padding-inline: 3px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.welcome-compact + .chips :is(svg, .sport-icon) { display: none; }
 .chips button { background: white; border-radius: 999px; }
 .chips button.active { color: white; background: var(--green); }
 .primary, .card-book { border-radius: 12px; font-weight: 650; }
