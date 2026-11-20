@@ -3,7 +3,7 @@ import os
 import unittest
 from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
-from test_owner_flow import main, headers, payload
+from test_owner_flow import reset_admin_quota, main, headers, payload
 
 
 class AdminAccessTests(unittest.TestCase):
@@ -30,7 +30,8 @@ class AdminIntegrationTests(unittest.TestCase):
         cls.context.__exit__(None, None, None)
 
     def setUp(self):
-        self.venue = self.client.post('/venues', headers=headers(701), json=payload()).json()['id']
+        reset_admin_quota()
+        self.venue = self.client.post('/venues', headers=headers(999), json={**payload(), 'owner_telegram_id': 701}).json()['id']
         self.url = f'/admin/venues/{self.venue}'
 
     def decide(self, action, reason=None):

@@ -38,6 +38,11 @@ def headers(user=101, age=0):
     fields['hash'] = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
     return {'X-Telegram-Init-Data': urlencode(fields)}
 
+def reset_admin_quota():
+    if os.getenv('TEST_DATABASE_URL'):
+        with main.db() as conn:
+            conn.execute("DELETE FROM request_limits WHERE subject=%s", (hashlib.sha256(b"user:999").hexdigest(),))
+
 def payload():
     output = BytesIO()
     Image.new('RGB', (400, 300), 'green').save(output, format='PNG')
@@ -47,6 +52,7 @@ def payload():
 
 class AuthTests(unittest.TestCase):
     def setUp(self):
+        reset_admin_quota()
         self.client = TestClient(main.app)
 
     def test_verified_identity(self):
@@ -81,15 +87,18 @@ class AuthTests(unittest.TestCase):
         self.assertEqual(venue.amenities, ['shower', 'lighting'])
         self.assertEqual(venue.extra_amenities, 'Sauna')
         for invalid in [{'amenities': ['unknown']}, {'extra_amenities': 'a' * 501}]:
-            self.assertEqual(self.client.post('/venues', headers=headers(), json={**payload(), **invalid}).status_code, 422)
+            self.assertEqual(self.client.post('/venues', headers=headers(999), json={**payload(), **invalid, 'owner_telegram_id': 101}).status_code, 422)
 
     def test_missing_photos_and_large_body(self):
         data = payload(); data['photos'] = []
-        self.assertEqual(self.client.post('/venues', headers=headers(), json=data).status_code, 422)
-        self.assertEqual(self.client.post('/venues', headers=headers(), content=b' ' * 7500001).status_code, 413)
+        self.assertEqual(self.client.post('/venues', headers=headers(999), json={**data, 'owner_telegram_id': 101}).status_code, 422)
+        self.assertEqual(self.client.post('/venues', headers=headers(999), content=b' ' * 7500001).status_code, 413)
 
 @unittest.skipUnless(os.environ.get('TEST_DATABASE_URL'), 'Disposable PostgreSQL required')
 class OwnerIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        reset_admin_quota()
+
     @classmethod
     def setUpClass(cls):
         cls.context = TestClient(main.app)
@@ -100,8 +109,9 @@ class OwnerIntegrationTests(unittest.TestCase):
         cls.context.__exit__(None, None, None)
 
     def test_submission_owner_isolation_moderation_and_photo_access(self):
-        data = payload(); data['owner_telegram_id'] = 202
-        response = self.client.post('/venues', headers=headers(101), json=data)
+        data = payload()
+        self.assertEqual(self.client.post('/venues', headers=headers(101), json={**data, 'owner_telegram_id': 101}).status_code, 403)
+        response = self.client.post('/venues', headers=headers(999), json={**data, 'owner_telegram_id': 101})
         self.assertEqual(response.status_code, 201, response.text)
         venue_id = response.json()['id']
         own = self.client.get('/owner/venues', headers=headers(101)).json()
@@ -123,13 +133,13 @@ class OwnerIntegrationTests(unittest.TestCase):
     def test_invalid_photo_does_not_create_venue(self):
         before = self.client.get('/owner/venues', headers=headers(303)).json()
         data = payload(); data['photos'].append('invalid')
-        self.assertEqual(self.client.post('/venues', headers=headers(303), json=data).status_code, 422)
+        self.assertEqual(self.client.post('/venues', headers=headers(999), json={**data, 'owner_telegram_id': 303}).status_code, 422)
         self.assertEqual(self.client.get('/owner/venues', headers=headers(303)).json(), before)
 
     def test_availability_uses_namangan_day_and_updates_after_cancel(self):
         with main.db() as conn:
             conn.execute("INSERT INTO telegram_contacts(telegram_id,phone) VALUES (202,'+998901234567') ON CONFLICT DO NOTHING")
-        response = self.client.post('/venues', headers=headers(101), json=payload())
+        response = self.client.post('/venues', headers=headers(999), json={**payload(), 'owner_telegram_id': 101})
         venue_id = response.json()['id']
         day = (datetime.now(timezone(timedelta(hours=5))) + timedelta(days=1)).date().isoformat()
         url = f'/venues/{venue_id}/availability?day={day}'
@@ -150,7 +160,7 @@ class OwnerIntegrationTests(unittest.TestCase):
         self.assertEqual(self.client.get(f'/venues/{venue_id}/availability?day=2020-01-01').status_code, 422)
 
     def test_edit_requires_owner_and_reapproval(self):
-        venue_id = self.client.post('/venues', headers=headers(401), json=payload()).json()['id']
+        venue_id = self.client.post('/venues', headers=headers(999), json={**payload(), 'owner_telegram_id': 401}).json()['id']
         self.client.post(f'/admin/venues/{venue_id}/approved', headers=headers(999))
         venue = next(v for v in self.client.get('/owner/venues', headers=headers(401)).json() if v['id'] == venue_id)
         change = {**payload(), 'name': 'Updated pitch', 'amenities': ['shower', 'lighting'], 'extra_amenities': 'Sauna', 'photos': [], 'keep_photos': venue['photos']}
@@ -167,7 +177,7 @@ class OwnerIntegrationTests(unittest.TestCase):
         self.assertNotIn(venue_id, [v['id'] for v in self.client.get('/venues').json()])
 
     def test_verified_phone_snapshot_privacy_and_deletion_safeguard(self):
-        venue_id = self.client.post('/venues', headers=headers(501), json=payload()).json()['id']
+        venue_id = self.client.post('/venues', headers=headers(999), json={**payload(), 'owner_telegram_id': 501}).json()['id']
         self.client.post(f'/admin/venues/{venue_id}/approved', headers=headers(999))
         start = (datetime.now(timezone.utc) + timedelta(days=1)).replace(minute=0,second=0,microsecond=0).isoformat()
         data = {'venue_id': venue_id, 'start_at': start, 'customer_phone': '+998999999999'}

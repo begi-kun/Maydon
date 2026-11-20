@@ -81,10 +81,12 @@ def authenticate(init_data: str = Header(default='', alias='X-Telegram-Init-Data
 def auth_me(response: Response, init_data: str = Header(default='', alias='X-Telegram-Init-Data')):
     user = telegram_identity(init_data)
     response.headers['Cache-Control'] = 'private, no-store'
+    is_owner = False
     if DATABASE_URL:
         with db() as conn:
+            is_owner = conn.execute('SELECT EXISTS(SELECT 1 FROM venues WHERE owner_telegram_id=%s AND deleted_at IS NULL) AS owns', (user['id'],)).fetchone()['owns']
             conn.execute('INSERT INTO telegram_profiles(telegram_id,first_name,username) VALUES (%s,%s,%s) ON CONFLICT (telegram_id) DO UPDATE SET first_name=EXCLUDED.first_name,username=EXCLUDED.username', (user['id'],user['first_name'],user['username']))
-    return {**user, 'admin': bool(ADMIN_ID and str(user['id']) == ADMIN_ID)}
+    return {**user, 'owner': is_owner, 'admin': bool(ADMIN_ID and str(user['id']) == ADMIN_ID)}
 
 @app.get('/auth/config')
 def auth_config():
@@ -167,6 +169,10 @@ class VenueIn(BaseModel):
     def validate_hours(cls, value):
         hours_window(value)
         return value.strip()
+
+
+class AdminVenueIn(VenueIn):
+    owner_telegram_id: int = Field(gt=0, le=2**52-1)
 
 
 class VenueEdit(VenueIn):
@@ -338,9 +344,9 @@ def availability(venue_id: int, day: date):
     return {'day': day.isoformat(), 'timezone': 'Asia/Tashkent', 'hours': venue['hours'], 'slots': slots}
 
 @app.post('/venues', status_code=201)
-async def request_venue(request: Request, user: int = Depends(authenticate)):
-    venue = await read_venue(request, VenueIn)
-    return await run_in_threadpool(save_venue, venue, user)
+async def request_venue(request: Request, _: int = Depends(admin)):
+    venue = await read_venue(request, AdminVenueIn)
+    return await run_in_threadpool(save_venue, venue, venue.owner_telegram_id)
 
 async def read_venue(request: Request, model):
     body = bytearray()
@@ -397,7 +403,7 @@ def save_venue(venue: VenueIn, user: int):
     photos = [prepare_photo(photo) for photo in venue.photos]
     with db() as conn:
         result = conn.execute('''INSERT INTO venues(name,sport,address,latitude,longitude,price,phone,hours,amenities,extra_amenities,owner_telegram_id)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''', (*venue.model_dump(exclude={'photos'}).values(),user)).fetchone()
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''', (*venue.model_dump(exclude={'photos', 'owner_telegram_id'}).values(),user)).fetchone()
         for photo in photos:
             conn.execute('INSERT INTO venue_photos(venue_id,image) VALUES (%s,%s)', (result['id'], photo))
         if ADMIN_ID:
