@@ -17,15 +17,16 @@ export const directions = (lat:number, lon:number) => `https://yandex.com/maps/?
 // Map previews use longitude,latitude; routing uses latitude,longitude.
 export const mapLocation = (lat:number, lon:number) => `https://yandex.com/maps/?${new URLSearchParams({ll:`${lon},${lat}`,pt:`${lon},${lat}`,z:'18',l:'map'})}`;
 
-export function PhotoGallery({ids=[]}:{ids?:number[]}) {
- return <div className="photos" tabIndex={ids.length>1?0:undefined} role={ids.length>1?'group':undefined} aria-label={ids.length>1?'Maydon rasmlari — yon tomonga suring':undefined}>{ids.map(id=><PitchPhoto key={id} id={id}/>)}</div>;
+export function PhotoGallery({ids=[],fallback}:{ids?:number[];fallback?:React.ReactNode}) {
+ return <div className="photos" tabIndex={ids.length>1?0:undefined} role={ids.length>1?'group':undefined} aria-label={ids.length>1?'Maydon rasmlari — yon tomonga suring':undefined}>{ids.map(id=><PitchPhoto key={id} id={id} fallback={fallback}/>)}</div>;
 }
-function PitchPhoto({id}:{id:number}) {
+function PitchPhoto({id,fallback}:{id:number;fallback?:React.ReactNode}) {
  const [url,setUrl]=useState('');const [failed,setFailed]=useState(false);
  useEffect(()=>{setUrl('');setFailed(false);let active=true;let objectUrl='';const abort=new AbortController();
   fetch(`${API}/photos/${id}`,{headers:authHeaders(),signal:abort.signal}).then(r=>{if(!r.ok)throw Error();return r.blob()}).then(blob=>{if(active){objectUrl=URL.createObjectURL(blob);setUrl(objectUrl)}}).catch(()=>{if(active&&!abort.signal.aborted)setFailed(true)});
   return()=>{active=false;abort.abort();if(objectUrl)URL.revokeObjectURL(objectUrl)};
  },[id]);
+ if(fallback && (failed || !url))return <div className="gallery-fallback">{fallback}<span className="sr-only">{failed?'Rasm mavjud emas':'Rasm yuklanmoqda…'}</span></div>;
  return failed?<span className="photo-unavailable">Rasm mavjud emas</span>:url?<img src={url} onError={()=>setFailed(true)} alt="Maydon rasmi"/>:<span role="status">Rasm yuklanmoqda…</span>;
 }
 
