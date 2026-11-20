@@ -33,7 +33,7 @@ try {
   const url=new URL(route.request().url()),path=url.pathname;
   const json=data=>route.fulfill({json:data});
   if(path==='/auth/config')return json({bot_username:'maydon_test_bot'});
-  if(path==='/auth/me')return json({id:101,first_name:'Test egasi',admin:false});
+  if(path==='/auth/me')return json({id:101,first_name:'Test egasi',owner:true,admin:false});
   if(path==='/auth/contact')return json({phone:contact?'+998900000001':null});
   if(path==='/owner/venues')return json([venue]);
   if(path==='/owner/overview')return json({today:1,pending:1,value:150000,unpaid:1});
