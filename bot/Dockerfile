@@ -5,4 +5,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY main.py .
 COPY contacts.py .
 COPY reminders.py .
+COPY availability_alerts.py .
 CMD ["python", "main.py"]
