@@ -25,12 +25,12 @@ Updated November 19, 2026. Production runs on Railway; see README.md for deploym
 - [x] Shared rate limits and request-size protection deployed and live-checked.
 - [x] Fresh logical backup verified by an isolated PostgreSQL 18.6 restore: all 17 tables, 12 bookings and 8 photos matched; photos decoded. See RECOVERY_RUNBOOK.md and the November 19 recovery evidence.
 - [ ] Verify scheduled Railway backup frequency/retention and recovery from an existing scheduled snapshot; name the response owner.
-- [ ] Versioned migrations with upgrade tests.
+- [x] Versioned SQL migrations with legacy upgrade and repeat-start tests.
 - [ ] External alerts and notification-backlog monitoring.
 - [ ] Accurate privacy/support information, retention and deletion process.
 - [ ] Real-account end-to-end checks for booking, confirmation, cancellation and reminders.
 - [ ] Verify map provider domain restrictions and quota.
-- [ ] Require hosted CI before merge; adding a workflow does not enforce this automatically.
+- [x] GitHub main branch protection requires both frontend and backend checks (verified November 20).
 
 ## Known boundaries
 
@@ -38,6 +38,6 @@ Updated November 19, 2026. Production runs on Railway; see README.md for deploym
 - Payment states do not collect money or record deposit amounts.
 - At-least-once notifications may duplicate after a worker crash.
 - Telegram sign-in expires after one hour and may require reopening the app.
-- Startup applies additive schema changes; versioned migrations are planned.
+- Startup applies ordered SQL migrations in a single transaction. Append new numbered files in backend/app/migrations and preserve previously applied files.
 
 See UPDATE_PLAN.md for priorities and acceptance criteria.

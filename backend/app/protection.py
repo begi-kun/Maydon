@@ -9,12 +9,6 @@ from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse
 
-SCHEMA = '''
-CREATE TABLE IF NOT EXISTS request_limits (
- scope TEXT NOT NULL, subject TEXT NOT NULL, hits INTEGER NOT NULL,
- expires_at TIMESTAMPTZ NOT NULL, PRIMARY KEY(scope,subject));
-CREATE INDEX IF NOT EXISTS request_limits_expiry ON request_limits(expires_at);
-'''
 # Reads accommodate calendars and photo galleries; writes share an account budget.
 POLICIES = {'read': (600, 60), 'auth': (20, 60),
             'write': (60, 60), 'public_write': (120, 60), 'submission': (10, 600)}

@@ -13,10 +13,14 @@ def fetch(url):
         return response.read().decode('utf-8')
 
 
-def check(api, web, design=False):
+def check(api, web, design=False, notifications=False):
     if json.loads(fetch(api + '/health')) != {'status': 'ok'}:
         raise ValueError('API is not healthy')
     print('PASS: API and database health')
+    if notifications:
+        if json.loads(fetch(api + '/health/notifications')) != {'status': 'ok'}:
+            raise ValueError('Notification queue needs attention')
+        print('PASS: notification delivery queue')
     paths = json.loads(fetch(api + '/openapi.json'))['paths']
     required = ['/owner/schedule', '/owner/manual-bookings', '/owner/overview',
                 '/owner/blocks', '/owner/payments/{booking_id}', '/admin/attention',
@@ -53,9 +57,10 @@ if __name__ == '__main__':
     parser.add_argument('--api', default='https://maydon-production-ba2c.up.railway.app')
     parser.add_argument('--web', default='https://maydon-web-production-3612.up.railway.app')
     parser.add_argument('--design', action='store_true', help='Also require the November design release')
+    parser.add_argument('--notifications', action='store_true', help='Check notification backlog health')
     args = parser.parse_args()
     try:
-        check(args.api.rstrip('/'), args.web.rstrip('/'), args.design)
+        check(args.api.rstrip('/'), args.web.rstrip('/'), args.design, args.notifications)
     except (HTTPError, URLError, TimeoutError, ValueError, KeyError):
         # Avoid printing response bodies or connection details into deployment logs.
         print('FAIL: deployment check failed; inspect service health, authentication and assets.', file=sys.stderr)

@@ -5,6 +5,8 @@ import psycopg
 from psycopg.rows import dict_row
 from datetime import datetime, timezone
 from test_owner_flow import main
+from app.migrate import MIGRATIONS
+baseline_sql = (MIGRATIONS / "001_main.sql").read_text()
 from reminders import queue_reminders, pending_notifications, reminder_is_current, reminder_body
 
 
@@ -20,7 +22,7 @@ class ReminderTextTests(unittest.TestCase):
 class ReminderIntegrationTests(unittest.TestCase):
     def setUp(self):
         self.conn = psycopg.connect(main.DATABASE_URL, row_factory=dict_row)
-        self.conn.execute(main.SCHEMA)
+        self.conn.execute(baseline_sql)
         self.conn.commit()
         # Isolate the delivery batch from notifications left by other test classes.
         # This change rolls back with the reminder test transaction.
