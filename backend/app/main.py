@@ -764,16 +764,34 @@ def owner_analytics(response: Response, from_date: date | None = None, to_date: 
     return booking_analytics(response, user, from_date, to_date, all_time, venue_id)
 
 # Admin operations: all personal information is authenticated and never cached.
+# Used by the admin inbox and the aggregate external health check.
+NOTIFICATIONS_NEEDING_ATTENTION = """FROM notifications n LEFT JOIN bookings b ON b.id=n.reminder_booking_id
+    WHERE n.sent_at IS NULL AND (n.attempts>0 OR n.created_at<NOW()-INTERVAL '5 minutes')
+             AND (n.reminder_booking_id IS NULL OR (b.status='confirmed' AND b.start_at>NOW())) AND (n.availability_subscription_id IS NULL OR EXISTS (SELECT 1 FROM availability_subscriptions s WHERE s.id=n.availability_subscription_id AND s.cancelled_at IS NULL AND s.start_at>NOW()+INTERVAL '5 minutes'))"""
+
+
+@app.get('/health/notifications')
+def notification_health():
+    headers = {'Cache-Control': 'no-store'}
+    try:
+        with db() as conn:
+            conn.execute("SET LOCAL statement_timeout = '3s'")
+            delayed = conn.execute("SELECT EXISTS(SELECT 1 " + NOTIFICATIONS_NEEDING_ATTENTION + ") AS delayed").fetchone()['delayed']
+    except (psycopg.Error, HTTPException):
+        return JSONResponse({'status': 'unavailable'}, status_code=503, headers=headers)
+    if delayed:
+        return JSONResponse({'status': 'delayed'}, status_code=503, headers=headers)
+    return JSONResponse({'status': 'ok'}, headers=headers)
+
+
 @app.get('/admin/attention')
 def admin_attention(response: Response, _: int = Depends(admin)):
     response.headers['Cache-Control'] = 'private, no-store'
     with db() as conn:
-        counts = conn.execute("""SELECT
+        counts = conn.execute(f"""SELECT
             (SELECT count(*) FROM venues WHERE status='pending' AND deleted_at IS NULL) AS venues,
             (SELECT count(*) FROM bookings WHERE status='pending' AND start_at>NOW()) AS bookings,
-            (SELECT count(*) FROM notifications n LEFT JOIN bookings b ON b.id=n.reminder_booking_id
-             WHERE n.sent_at IS NULL AND (n.attempts>0 OR n.created_at<NOW()-INTERVAL '5 minutes')
-             AND (n.reminder_booking_id IS NULL OR (b.status='confirmed' AND b.start_at>NOW())) AND (n.availability_subscription_id IS NULL OR EXISTS (SELECT 1 FROM availability_subscriptions s WHERE s.id=n.availability_subscription_id AND s.cancelled_at IS NULL AND s.start_at>NOW()+INTERVAL '5 minutes'))) AS notifications""").fetchone()
+            (SELECT count(*) {NOTIFICATIONS_NEEDING_ATTENTION}) AS notifications""").fetchone()
         venues = conn.execute("SELECT id,name,owner_telegram_id,suspended FROM venues WHERE status='pending' AND deleted_at IS NULL ORDER BY id LIMIT 20").fetchall()
         bookings = conn.execute("""SELECT b.id,b.venue_id,v.name AS venue_name,b.start_at,b.created_at,v.owner_telegram_id
             FROM bookings b JOIN venues v ON v.id=b.venue_id WHERE b.status='pending' AND b.start_at>NOW()

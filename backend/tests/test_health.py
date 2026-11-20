@@ -35,3 +35,23 @@ class HealthIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {'status': 'ok'})
         self.assertEqual(response.headers['cache-control'], 'no-store')
+
+    def test_notification_health_reports_stalled_queue_and_recovery(self):
+        from contextlib import nullcontext
+        from uuid import uuid4
+        from app.migrate import apply_migrations
+        with main.db() as conn:
+            schema = "queue_test_" + uuid4().hex
+            conn.execute(f"CREATE SCHEMA {schema}")
+            conn.execute(f"SET LOCAL search_path TO {schema}")
+            apply_migrations(conn)
+            with patch.object(main, 'db', lambda: nullcontext(conn)):
+                client = TestClient(main.app)
+                self.assertEqual(client.get('/health/notifications').status_code, 200)
+                conn.execute("INSERT INTO notifications(recipient_id,body,created_at) VALUES (1,'private',NOW()-INTERVAL '6 minutes')")
+                response = client.get('/health/notifications')
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json(), {'status': 'delayed'})
+                conn.execute("UPDATE notifications SET sent_at=NOW()")
+                self.assertEqual(client.get('/health/notifications').status_code, 200)
+            conn.rollback()
