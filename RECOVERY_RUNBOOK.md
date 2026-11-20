@@ -1,4 +1,4 @@
-# MAYDON backup and recovery
+# Bronn backup and recovery
 
 A logical backup drill copies a consistent production snapshot into a fresh local
 PostgreSQL cluster. It never restores into production. No API or bot is attached

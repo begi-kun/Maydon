@@ -1,4 +1,4 @@
-# MAYDON — Telegram sports venue booking (launch candidate)
+# Bronn — Telegram sports venue booking (launch candidate)
 
 **Status:** development launch candidate, NOT production verified. See [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md).
 
@@ -75,7 +75,7 @@ and [Dockerfile detection](https://docs.railway.com/builds/dockerfiles).
 ## Owner sign-in and pitch submissions
 
 Open [@maydontopbot](https://t.me/maydontopbot), press Start, then use the
-MAYDON button. The website's Telegram sign-in link opens this flow; ordinary
+Bronn button. The website's Telegram sign-in link opens this flow; ordinary
 browser visits remain guests. `/auth/me` verifies Telegram's signed Mini App
 data before displaying an account. Set backend `BOT_USERNAME=maydontopbot`.
 
@@ -119,12 +119,6 @@ Backend checks (use an empty disposable PostgreSQL database): install
 Frontend check: run `npm ci && npm run build` in `miniapp/`.
 
 **Before wider public promotion:** Complete rate limits, monitoring, backup restore checks, privacy/support information and real-account end-to-end tests. Owner/admin UI, notifications and opening-hour validation are implemented. See [the update plan](UPDATE_PLAN.md) and [release checklist](PRODUCTION_CHECKLIST.md).
-# Maydon
-# Maydon
-# Maydon
-# Maydon
-# Maydon
-# Maydon
 
 ## Admin venue and booking management
 

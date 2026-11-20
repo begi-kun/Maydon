@@ -1,4 +1,4 @@
-"""MAYDON API. Requires PostgreSQL and validated Telegram WebApp initData."""
+"""Bronn API. Requires PostgreSQL and validated Telegram WebApp initData."""
 import hashlib
 import hmac
 import json
@@ -33,7 +33,7 @@ UZBEKISTAN_TIME = timezone(timedelta(hours=5))
 def booking_time_label(value: datetime) -> str:
     return value.astimezone(UZBEKISTAN_TIME).strftime('%d.%m.%Y · %H:%M') + ' (Oʻzbekiston vaqti, UTC+5)'
 
-app = FastAPI(title='MAYDON API', docs_url=None, redoc_url=None)
+app = FastAPI(title='Bronn API', docs_url=None, redoc_url=None)
 
 
 @contextmanager

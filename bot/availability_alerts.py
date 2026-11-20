@@ -50,7 +50,7 @@ def queue_availability_alerts(conn):
             conn.execute("UPDATE availability_subscriptions SET next_check_at=NOW()+INTERVAL '1 minute' WHERE id=%s", (row['id'],))
             continue
         local = row['start_at'].astimezone(timezone(timedelta(hours=5)))
-        body = f'🔔 {row["name"]}: {local:%d.%m.%Y · %H:%M} (UTC+5) vaqti boʻshadi.\nBu xabar joyni band qilmaydi. MAYDONda bron yuboring; server vaqtni qayta tekshiradi va egasi tasdiqlaydi.'
+        body = f'🔔 {row["name"]}: {local:%d.%m.%Y · %H:%M} (UTC+5) vaqti boʻshadi.\nBu xabar joyni band qilmaydi. Bronnda bron yuboring; server vaqtni qayta tekshiradi va egasi tasdiqlaydi.'
         conn.execute('''INSERT INTO notifications(recipient_id,body,availability_subscription_id) VALUES (%s,%s,%s)
             ON CONFLICT (availability_subscription_id) DO NOTHING''', (row['user_id'],body,row['id']))
         conn.execute('UPDATE availability_subscriptions SET queued_at=NOW() WHERE id=%s', (row['id'],))

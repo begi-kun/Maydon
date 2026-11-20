@@ -1,4 +1,4 @@
-# MAYDON production checklist
+# Bronn production checklist
 
 Updated November 19, 2026. Production runs on Railway; see README.md for deployment commands.
 
