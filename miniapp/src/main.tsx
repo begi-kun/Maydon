@@ -118,8 +118,8 @@ function App(){
  function venueCard(v:Venue){
   const pending=!!searchTime && searchLoading;
   const address=v.address.startsWith('Xaritadagi joy:')?'Joylashuv xaritada belgilangan':v.address;
-  return <button className="venue-card" disabled={pending} key={v.id} onClick={()=>openVenue(v)}>
-   <div className="venue-image">{v.photos?.length?<PhotoGallery ids={v.photos.slice(0,1)} fallback={<VenueArt sport={v.sport}/>}/>:<VenueArt sport={v.sport}/>}</div>
+  return <article className="venue-card" key={v.id}>
+   <div className="venue-image">{v.photos?.length?<PhotoGallery ids={v.photos} fallback={<VenueArt sport={v.sport}/>}/>:<VenueArt sport={v.sport}/>}</div>
    <div className="venue-content">
     <span className="venue-sport">{sportName(v.sport)}</span>
     <h3>{v.name}</h3>
@@ -128,8 +128,8 @@ function App(){
     {!searchTime&&shown[0]?.id===v.id&&<AvailabilityPreview key={filterDay} venueId={v.id} day={filterDay}/>}
     {searchTime&&!searchError&&<p className="venue-slot"><Clock3 size={14}/>{filterTime} · {pending?'Tekshirilmoqda…':'1 soat uchun boʻsh'}</p>}
    </div>
-   <div className="venue-footer"><div><strong>{price(v.price)}</strong> <span>soʻm / soat</span></div><span className="card-book">{searchTime?'Vaqtni tanlash':'Boʻsh vaqtlarni koʻrish'} <ArrowRight size={14}/></span></div>
-  </button>
+   <div className="venue-footer"><div><strong>{price(v.price)}</strong> <span>soʻm / soat</span></div><button className="card-book" disabled={pending} aria-label={v.name} onClick={()=>openVenue(v)}>{searchTime?'Vaqtni tanlash':'Boʻsh vaqtlarni koʻrish'} <ArrowRight size={14}/></button></div>
+  </article>
  }
  const tomorrow=localDate(new Date(Date.parse(`${today}T12:00:00+05:00`)+86400000));
  const quickTimes=[{day:today,time:'18:00',label:'Bugun 18:00'},{day:today,time:'20:00',label:'Bugun 20:00'},{day:today,time:'22:00',label:'Bugun 22:00'},{day:tomorrow,time:'20:00',label:'Ertaga 20:00'}].filter(item=>!filterTimeDisabled(item.day,item.time));
