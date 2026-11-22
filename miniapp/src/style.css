@@ -252,3 +252,25 @@ h1, h2, h3, h4 { letter-spacing: -.035em; }
     font-size: 16px;
   }
 }
+
+.owner-workspace .owner-tabs {
+ display:grid;
+ grid-template-columns:repeat(4,minmax(0,1fr));
+ gap:6px;
+ margin:16px 0;
+}
+.owner-workspace .owner-tabs button {
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ gap:8px;
+ white-space:normal;
+ line-height:1.2;
+}
+.owner-section-title {margin:18px 0 12px;font-size:1.25rem}
+.owner-date-controls {padding:10px 12px;background:#f3f7f2;border-radius:12px}
+.owner-action-title {margin:18px 0 8px;font-size:1rem}
+@media(max-width:600px) {
+ .owner-workspace .owner-tabs {grid-template-columns:repeat(2,minmax(0,1fr))}
+ .owner-workspace .owner-tabs button {justify-content:flex-start;padding:8px 12px}
+}
