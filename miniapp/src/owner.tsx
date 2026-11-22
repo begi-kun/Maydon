@@ -26,7 +26,7 @@ export function PhotoGallery({ids=[],fallback}:{ids?:number[];fallback?:React.Re
   if(row && slide)row.scrollLeft+=slide.getBoundingClientRect().left-row.getBoundingClientRect().left;
  }
  return <div className="venue-gallery">
-  <div className="photos" ref={track} onScroll={()=>{
+  <div className="photos" tabIndex={ids.length>1?0:undefined} role={ids.length>1?'group':undefined} aria-label={ids.length>1?'Maydon rasmlari — yon tomonga suring':undefined} ref={track} onScroll={()=>{
    const row=track.current;
    if(row?.clientWidth)setIndex(Math.round(row.scrollLeft/row.clientWidth));
   }}>{ids.map(id=><div className="gallery-slide" key={id}><PitchPhoto id={id} fallback={fallback}/></div>)}</div>
