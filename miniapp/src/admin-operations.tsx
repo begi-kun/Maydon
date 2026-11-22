@@ -40,9 +40,43 @@ export function ActivityPanel({navigate,openBooking}:{navigate:Navigate;openBook
  return <div className="admin-operations"><h2>Admin faoliyati</h2><p className="analytics-note">Kim, qachon va nima sababdan amal bajargan. Vaqt: UTC+5.</p><form className="admin-filters" onSubmit={filter}><label>Obyekt<select name="entity"><option value="all">Barchasi</option><option value="venue">Maydon</option><option value="booking">Bron</option></select></label><label>Obyekt ID<input name="entity_id" type="number" min="1"/></label><label>Admin ID<input name="actor_id" type="number" min="1"/></label><label>Amal<select name="action"><option value="all">Barchasi</option>{['approved','rejected','suspend','resume','cancelled'].map(s=><option value={s} key={s}>{label(s)}</option>)}</select></label><label>Sana<input name="day" type="date"/></label><button type="submit">Qidirish</button></form><Feedback loading={loading} error={error}/>{data&&<>{!data.length?<Empty/>:<div className="admin-results">{data.map(a=><article key={a.id} className="setting"><span className="eyebrow">{time(a.created_at)}</span><h3>{label(a.action)}</h3><p>Admin: {a.admin_id} · {a.entity_type==='venue'?'Maydon':'Bron'} #{a.entity_id}</p>{a.reason&&<p>Sabab: {a.reason}</p>}<button onClick={()=>a.entity_type==='booking'?openBooking(a.entity_id):navigate('venues',{q:String(a.entity_id),status:'all'})}>Yozuvni ochish →</button></article>)}</div>}<Pages offset={offset} setOffset={setOffset} count={data.length}/></>}</div>
 }
 type Notification={id:number;recipient_id:number;booking_id?:number|null;created_at:string;retry_after:string;attempts:number;last_error:string|null;sent_at?:string|null;delivery_status?:string};
+function MessageComposer(){
+ const [audience,setAudience]=useState('customers');
+ const [message,setMessage]=useState('');
+ const [busy,setBusy]=useState(false);
+ const [notice,setNotice]=useState('');
+ const [error,setError]=useState('');
+ const request=React.useRef<{payload:string;id:string}|null>(null);
+ async function send(e:React.FormEvent){
+  e.preventDefault();
+  if(busy || !message.trim())return;
+  setBusy(true);setError('');setNotice('');
+  try{
+   const payload=JSON.stringify([audience,message.trim()]);
+   if(request.current?.payload!==payload)request.current={payload,id:crypto.randomUUID()};
+   const response=await fetch(API+'/admin/messages',{method:'POST',headers:{...authHeaders(),'Content-Type':'application/json'},
+    body:JSON.stringify({audience,text:message.trim(),request_id:request.current.id})});
+   if(!response.ok)throw Error(response.status===403?'Admin huquqi talab qilinadi.':'Xabarni navbatga qoʻyib boʻlmadi.');
+   const {queued}=await response.json();
+   setNotice(queued ? queued+' kishiga xabar yuborish navbatga qoʻyildi.' : 'Bu guruhda Telegram orqali xabar oladigan kishi yoʻq.');
+   if(queued)setMessage('');
+   request.current=null;
+  }catch(e){setError(e instanceof Error?e.message:'Qayta urinib koʻring.')}
+  finally{setBusy(false)}
+ }
+ return <form className="setting admin-filters" onSubmit={send}>
+  <h2>Telegram orqali xabar yuborish</h2>
+  <label>Qabul qiluvchilar<select disabled={busy} value={audience} onChange={e=>setAudience(e.target.value)}>
+   <option value="customers">Foydalanuvchilar</option><option value="owners">Maydon egalari</option><option value="all">Barchasi</option>
+  </select></label>
+  <label>Xabar matni<textarea required maxLength={4096} disabled={busy} value={message} onChange={e=>setMessage(e.target.value)}/></label>
+  <button disabled={busy||!message.trim()}>{busy?'Navbatga qoʻyilmoqda…':'Xabarni yuborish'}</button>
+  {notice&&<p role="status">{notice}</p>}{error&&<p role="alert">{error}</p>}
+ </form>
+}
 export function NotificationsPanel({navigate,openBooking}:{navigate:Navigate;openBooking:(id:number)=>void}){
  const [offset,setOffset]=useState(0),[revision,refresh]=useState(0);const {data,error,loading}=useData<Notification[]>(`/admin/notifications?offset=${offset}`,revision);
- return <div className="admin-operations"><div className="section-heading"><h2>Xabar yetkazish muammolari</h2><button disabled={loading} onClick={()=>refresh(n=>n+1)}>Yangilash</button></div><p className="analytics-note">Bot avtomatik qayta urinadi. Qabul qiluvchi botni ishga tushirmagan yoki bloklagan boʻlishi mumkin.</p><Feedback loading={loading} error={error}/>{data&&<>{!data.length?<Empty/>:<div className="admin-results">{data.map(n=><article className="setting" key={n.id}><h3>Xabar #{n.id}</h3><p>Qabul qiluvchi: {n.recipient_id}</p><p>Navbatga qoʻshilgan: {time(n.created_at)}</p><p>Urinishlar: {n.attempts} · {n.last_error||'Navbatda kechikmoqda'}</p><p>Qayta urinish vaqti: {time(n.retry_after)}</p><div className="decision-actions">{n.booking_id&&<button onClick={()=>openBooking(n.booking_id!)}>Bron #{n.booking_id}</button>}<button onClick={()=>navigate('people',{q:String(n.recipient_id)})}>Qabul qiluvchini topish</button></div></article>)}</div>}<Pages offset={offset} setOffset={setOffset} count={data.length}/></>}</div>
+ return <div className="admin-operations"><MessageComposer/><div className="section-heading"><h2>Xabar yetkazish muammolari</h2><button disabled={loading} onClick={()=>refresh(n=>n+1)}>Yangilash</button></div><p className="analytics-note">Bot avtomatik qayta urinadi. Qabul qiluvchi botni ishga tushirmagan yoki bloklagan boʻlishi mumkin.</p><Feedback loading={loading} error={error}/>{data&&<>{!data.length?<Empty/>:<div className="admin-results">{data.map(n=><article className="setting" key={n.id}><h3>Xabar #{n.id}</h3><p>Qabul qiluvchi: {n.recipient_id}</p><p>Navbatga qoʻshilgan: {time(n.created_at)}</p><p>Urinishlar: {n.attempts} · {n.last_error||'Navbatda kechikmoqda'}</p><p>Qayta urinish vaqti: {time(n.retry_after)}</p><div className="decision-actions">{n.booking_id&&<button onClick={()=>openBooking(n.booking_id!)}>Bron #{n.booking_id}</button>}<button onClick={()=>navigate('people',{q:String(n.recipient_id)})}>Qabul qiluvchini topish</button></div></article>)}</div>}<Pages offset={offset} setOffset={setOffset} count={data.length}/></>}</div>
 }
 type BookingDetail={booking:{id:number;venue_id:number;venue_name:string;owner_telegram_id:number;user_telegram_id:number|null;customer_name:string;customer_phone:string|null;source:string;status:string;payment_status:string;booked_price:number|null;start_at:string;created_at:string;cancellation_reason:string|null};history_complete:boolean;timeline:{id:number;created_at:string;actor_id:number|null;action:string;kind:string;reason:string|null}[];notifications:Notification[]};
 export function BookingDetailPanel({id,navigate,back}:{id:number;navigate:Navigate;back:()=>void}){
