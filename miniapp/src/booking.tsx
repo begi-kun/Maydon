@@ -9,7 +9,7 @@ const months=['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sen
 function dateLabel(value:string){const day=localDate(new Date(value));return `${Number(day.slice(8))} ${months[Number(day.slice(5,7))-1]}`;}
 type Slot={start_at:string;label:string;status:'available'|'booked'|'past'|'unavailable'|'closed'};
 export function localDate(date:Date){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tashkent',year:'numeric',month:'2-digit',day:'2-digit'}).format(date)}
-export function BookingPicker({sport,venueId,price,authenticated,botUsername,busy,revision,initialDay,initialTime,onBook}:{sport?:string;venueId:number;price:number;authenticated:boolean;botUsername:string;busy:boolean;revision:number;initialDay?:string;initialTime?:string;onBook:(time:string)=>void}){
+export function BookingPicker({venueName,mapUrl,sport,venueId,price,authenticated,botUsername,busy,revision,initialDay,initialTime,onBook}:{venueName:string;mapUrl?:string;sport?:string;venueId:number;price:number;authenticated:boolean;botUsername:string;busy:boolean;revision:number;initialDay?:string;initialTime?:string;onBook:(time:string)=>void}){
  const productFeatures=useProductFeatures();
  const [watchTime,setWatchTime]=useState('');
  const today=localDate(new Date());const maxDate=localDate(new Date(Date.now()+60*86400000));
@@ -22,7 +22,25 @@ export function BookingPicker({sport,venueId,price,authenticated,botUsername,bus
   return()=>controller.abort();
  },[venueId,day,revision,retry]);
  const days=Array.from({length:7},(_,index)=>{const date=new Date(`${today}T12:00:00+05:00`);date.setUTCDate(date.getUTCDate()+index);return {value:localDate(date),date}});
- const chosen=!loading&&!error&&time.startsWith(day)?slots.find(slot=>slot.start_at===time&&slot.status==='available'&&new Date(slot.start_at).getTime()>Date.now()+300000):undefined;
+ const chosen=!loading&&!error&&time&&localDate(new Date(time))===day?slots.find(slot=>slot.start_at===time&&slot.status==='available'&&new Date(slot.start_at).getTime()>Date.now()+300000):undefined;
+ const [players,setPlayers]=useState('');
+ const count=Number(players);
+ const validCount=/^\d+$/.test(players)&&Number.isSafeInteger(count)&&count>0;
+ const endTime=chosen?new Date(Date.parse(time)+3600000).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tashkent'}):'';
+ const money=new Intl.NumberFormat('uz-UZ',{maximumFractionDigits:0});
+ function shareTeam(){
+  if(!chosen||(players&&!validCount))return;
+  const lines=[
+   `${sport==='football'?'⚽ ':''}${venueName}da oʻynaymizmi?`,
+   `📅 ${dateLabel(time)} ${day.slice(0,4)}, ${chosen.label}–${endTime}`,
+   `💰 1 soatga ${money.format(price)} soʻm`,
+  ];
+  if(validCount)lines.push(`👥 ${count} kishi boʻlsak, kishi boshiga ${money.format(price/count)} soʻmdan`);
+  const link='https://t.me/share/url?'+new URLSearchParams({url:mapUrl||'',text:lines.join('\n')});
+  const app=window.Telegram?.WebApp;
+  if(app?.openTelegramLink)app.openTelegramLink(link);
+  else window.open(link,'_blank','noopener,noreferrer');
+ }
  const signIn=`https://t.me/${botUsername}?start=book_${venueId}${chosen?'_'+Math.floor(new Date(chosen.start_at).getTime()/1000):''}`;
  const hoursRange=hours.trim().match(/^(\d{2}):00\s*[-–—]\s*(\d{2}):00$/);
  const visibleSlots=slots.filter(slot=>{
@@ -51,7 +69,13 @@ export function BookingPicker({sport,venueId,price,authenticated,botUsername,bus
   {watchTime&&authenticated&&productFeatures.availability_alerts&&<SlotSubscription venueId={venueId} time={watchTime}/>}
   {['table_tennis','billiards'].includes(sport||'')&&<p className="field-help">Bron 1 soatlik. Keyingi soat boʻsh boʻlsa, egasi bilan qoʻshimcha haq evaziga uzaytirishingiz mumkin.</p>}
   {authenticated&&<BookingContact venueId={venueId} time={chosen?.start_at||''} botUsername={botUsername} onChange={setContactPhone}/>}
-  {chosen&&<div className="booking-summary"><div><strong>{dateLabel(time)} · {chosen.label}</strong><span>1 soat · {chosen.label}–{new Date(new Date(time).getTime()+3600000).toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Tashkent'})}</span></div><strong>{new Intl.NumberFormat('uz-UZ').format(price)} soʻm</strong></div>}
+  {chosen&&<div className="booking-summary"><div><strong>{dateLabel(time)} · {chosen.label}</strong><span>1 soat · {chosen.label}–{endTime}</span></div><strong>{new Intl.NumberFormat('uz-UZ').format(price)} soʻm</strong></div>}
+  {chosen&&<div className="team-share">
+   <label>Oʻyinchilar soni (ixtiyoriy)<input type="text" inputMode="numeric" value={players} onChange={e=>setPlayers(e.target.value)} aria-invalid={!!players&&!validCount}/></label>
+   {players&&!validCount&&<small>Musbat butun son kiriting.</small>}
+   {validCount&&<small>Kishi boshiga {money.format(price/count)} soʻm</small>}
+   <button className="secondary" type="button" disabled={!!players&&!validCount} onClick={shareTeam}><Send size={16}/> Jamoaga yuborish</button>
+  </div>}
   <p className="booking-explanation">Soʻrovingizni maydon egasi tasdiqlaydi.</p>{authenticated?<><button className="primary" disabled={!chosen||!contactPhone||busy||loading||!!error} onClick={()=>onBook(time)}>{busy?'Yuborilmoqda…':!chosen?'Kunni va vaqtni tanlang':!contactPhone?'Avval telefon raqamingizni ulashing':'Bron soʻrovi yuborish'}<ArrowRight size={18}/></button></>:<div className="booking-login"><p>Telegram hisobingiz bilan davom eting. Botdagi tugma sizni shu maydonga qaytaradi.</p>{botUsername?<a href={signIn} className="primary"><Send size={17}/> Telegramda bron qilish</a>:<p>Telegram botining menyusidan Bronnni oching.</p>}</div>}
  </div>;
 }

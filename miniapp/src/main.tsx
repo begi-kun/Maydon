@@ -11,7 +11,7 @@ import {AdminPanel} from './admin';
 import {OwnerPanel} from './owner-panel';
 import {MapExplorer} from './map-explorer';
 import {BookingPicker, localDate} from './booking';
-import {PhotoGallery, directions, API, authHeaders} from './owner';
+import {PhotoGallery, directions, mapLocation, API, authHeaders} from './owner';
 
 const invite = new URLSearchParams(window.location.search).get('invite') || '';
 const hasInvite = /^[0-9a-f]{32}$/.test(invite);
@@ -23,10 +23,19 @@ const sports=[['all','Barchasi'],['football','Futbol'],['table_tennis','Stol ten
 const sportName=(sport:string)=>sports.find(([id])=>id===sport)?.[1]||sport;
 const price=(amount:number)=>new Intl.NumberFormat('uz-UZ').format(amount);
 const statusName:Record<string,string>={pending:'Kutilmoqda',approved:'Tasdiqlangan',confirmed:'Tasdiqlangan',rejected:'Rad etilgan',cancelled:'Bekor qilingan'};
-declare global {interface Window {Telegram?:{WebApp?:{ready:()=>void;expand:()=>void;initData?:string;requestContact?:(callback:(shared:boolean)=>void)=>void;initDataUnsafe?:{user?:{id:number;first_name:string;owner:boolean}}}};ymaps?:any}}
+declare global {interface Window {Telegram?:{WebApp?:{openTelegramLink?:(url:string)=>void;ready:()=>void;expand:()=>void;initData?:string;requestContact?:(callback:(shared:boolean)=>void)=>void;initDataUnsafe?:{user?:{id:number;first_name:string;owner:boolean}}}};ymaps?:any}}
 const initData=()=>window.Telegram?.WebApp?.initData||'';
 function Status({value}:{value:string}){return <span className={`status status-${value}`}><i/>{statusName[value]||value}</span>}
 function Empty({title,children,action}:{title:string;children:React.ReactNode;action?:React.ReactNode}){return <div className="empty"><div className="empty-icon"><Goal size={30}/></div><h3>{title}</h3><p>{children}</p>{action}</div>}
+function venueMap(v:Venue){
+ return Number.isFinite(v.latitude)&&Number.isFinite(v.longitude)?mapLocation(v.latitude,v.longitude):undefined;
+}
+function VenueAddress({venue}:{venue:Venue}){
+ const address=venue.address?.trim();
+ const map=venueMap(venue);
+ const label=address&&!address.startsWith('Xaritadagi joy:')?address:map?<a href={map} target="_blank" rel="noreferrer">Xaritada ko‘rish</a>:null;
+ return label?<p className="venue-address"><MapPin size={14}/><span>{label}</span></p>:null;
+}
 function VenueArt({sport}:{sport:string}){return sport==='football'?<PitchArt/>:<div className="sport-placeholder" aria-hidden="true"><img src={`/icons/${sport==='table_tennis'?'table-tennis':'billiards'}.svg`} alt=""/></div>}
 function PitchArt(){return <div className="pitch-art" aria-hidden="true"><div className="pitch-lines"><i className="pitch-center"/><i className="pitch-box left"/><i className="pitch-box right"/></div></div>}
 function AvailabilityPreview({venueId,day}:{venueId:number;day:string}){
@@ -117,18 +126,18 @@ function App(){
  const loginPanel=<div className="login-card"><div className="login-symbol"><Send size={30}/></div><span className="eyebrow">SIZNING HISOBINGIZ</span><h2>Oʻyinga qoʻshiling.</h2><p>Oʻz Telegram hisobingiz orqali kiring. Maydonlarni bron qiling va bronlaringizni kuzating.</p>{authLoading?<p>Hisob tekshirilmoqda…</p>:botUsername?<a className="primary login-link" href={`https://t.me/${botUsername}?start=${tab==='invite'?`venue_${invite}`:'profile'}`}>Telegram orqali kirish <ArrowUpRight size={18}/></a>:<p>Ilovani Telegram botining menyusidan oching.</p>}<small>Botni oching → Start → Bronnni ochish</small></div>;
  function venueCard(v:Venue){
   const pending=!!searchTime && searchLoading;
-  const address=v.address.startsWith('Xaritadagi joy:')?'Joylashuv xaritada belgilangan':v.address;
+  const action=searchTime?`${filterTime} ga bron qilish`:'Vaqtni tanlash';
   return <article className="venue-card" key={v.id}>
    <div className="venue-image">{v.photos?.length?<PhotoGallery ids={v.photos} fallback={<VenueArt sport={v.sport}/>}/>:<VenueArt sport={v.sport}/>}</div>
    <div className="venue-content">
     <span className="venue-sport">{sportName(v.sport)}</span>
     <h3>{v.name}</h3>
-    <p className="venue-address"><MapPin size={14}/><span>{address}</span></p>
+    <VenueAddress venue={v}/>
     {position&&<p className="venue-distance"><Compass size={14}/>Sizdan ≈ {distanceLabel(v)}</p>}
     {!searchTime&&shown[0]?.id===v.id&&<AvailabilityPreview key={filterDay} venueId={v.id} day={filterDay}/>}
     {searchTime&&!searchError&&<p className="venue-slot"><Clock3 size={14}/>{filterTime} · {pending?'Tekshirilmoqda…':'1 soat uchun boʻsh'}</p>}
    </div>
-   <div className="venue-footer"><div><strong>{price(v.price)}</strong> <span>soʻm / soat</span></div><button className="card-book" disabled={pending} aria-label={v.name} onClick={()=>openVenue(v)}>{searchTime?'Vaqtni tanlash':'Boʻsh vaqtlarni koʻrish'} <ArrowRight size={14}/></button></div>
+   <div className="venue-footer"><div><strong>{price(v.price)}</strong> <span>soʻm / soat</span></div><button className="card-book" disabled={pending} aria-label={`${action} · ${v.name}`} onClick={()=>openVenue(v)}>{action} <ArrowRight size={14}/></button></div>
   </article>
  }
  const tomorrow=localDate(new Date(Date.parse(`${today}T12:00:00+05:00`)+86400000));
@@ -147,7 +156,7 @@ function App(){
   <main ref={mainRef} tabIndex={-1} id="main-content">
   {selected?<>
    <button className="back" onClick={()=>{setSelected(null)}}><ArrowLeft size={17}/> Maydonlarga qaytish</button>
-   <div className="detail-layout"><div className="detail-heading"><span className="eyebrow">{sportName(selected.sport)}</span><h1>{selected.name}</h1><p><MapPin size={16}/>{selected.address.startsWith('Xaritadagi joy:')?'Joylashuv xaritada belgilangan':selected.address}</p></div><aside className="booking-panel"><h2>{price(selected.price)} <small>soʻm / soat</small></h2><div className="divider"/><BookingPicker key={selected.id} sport={selected.sport} venueId={selected.id} price={selected.price} authenticated={!!verifiedUser} botUsername={botUsername} busy={bookingBusy} revision={availabilityRevision} initialDay={filterDay} initialTime={searchTime||undefined} onBook={book}/></aside><div className="venue-information"><div className="detail-gallery">{selected.photos?.length?<PhotoGallery ids={selected.photos} fallback={<VenueArt sport={selected.sport}/>}/>:<VenueArt sport={selected.sport}/>}</div><div className="detail-facts"><div><Clock3/><span>Ish vaqti<strong>{selected.hours||'Egasi bilan aniqlashtiring'}</strong></span></div><a href={directions(selected.latitude,selected.longitude)} target="_blank" rel="noreferrer"><MapPin/><span>Manzilga borish<strong>Yoʻnalishni ochish ↗</strong></span></a>{selected.phone&&<a href={`tel:${selected.phone}`}><Phone/><span>Maydon egasi<strong>{selected.phone}</strong></span></a>}</div><VenueAmenities amenities={selected.amenities} extra_amenities={selected.extra_amenities}/></div>
+   <div className="detail-layout"><div className="detail-heading"><span className="eyebrow">{sportName(selected.sport)}</span><h1>{selected.name}</h1><VenueAddress venue={selected}/></div><aside className="booking-panel"><h2>{price(selected.price)} <small>soʻm / soat</small></h2><div className="divider"/><BookingPicker key={selected.id} venueName={selected.name} mapUrl={venueMap(selected)} sport={selected.sport} venueId={selected.id} price={selected.price} authenticated={!!verifiedUser} botUsername={botUsername} busy={bookingBusy} revision={availabilityRevision} initialDay={filterDay} initialTime={searchTime||undefined} onBook={book}/></aside><div className="venue-information"><div className="detail-gallery">{selected.photos?.length?<PhotoGallery ids={selected.photos} fallback={<VenueArt sport={selected.sport}/>}/>:<VenueArt sport={selected.sport}/>}</div><div className="detail-facts"><div><Clock3/><span>Ish vaqti<strong>{selected.hours||'Egasi bilan aniqlashtiring'}</strong></span></div><a href={directions(selected.latitude,selected.longitude)} target="_blank" rel="noreferrer"><MapPin/><span>Manzilga borish<strong>Yoʻnalishni ochish ↗</strong></span></a>{selected.phone&&<a href={`tel:${selected.phone}`}><Phone/><span>Maydon egasi<strong>{selected.phone}</strong></span></a>}</div><VenueAmenities amenities={selected.amenities} extra_amenities={selected.extra_amenities}/></div>
    </div>
   </>:<>
   {tab==='home'&&<>
