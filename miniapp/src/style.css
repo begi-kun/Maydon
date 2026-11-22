@@ -285,3 +285,8 @@ h1, h2, h3, h4 { letter-spacing: -.035em; }
 .gallery-controls{position:absolute;bottom:4px;right:4px;z-index:1;display:flex;align-items:center;background:#193529;color:white;border-radius:5px;font-size:11px}
 .gallery-controls button{background:transparent;color:white;border:0;font-size:20px;width:24px;padding:0}
 .venue-card:has(.gallery-controls) .photos{position:relative;z-index:1}
+
+.team-share {display:grid;gap:8px;margin:12px 0}
+.team-share label {display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.9rem}
+.team-share input {width:5rem;padding:8px;border:1px solid #bdc9c0;border-radius:8px;font:inherit}
+.venue-address a {color:inherit;text-decoration:underline}
