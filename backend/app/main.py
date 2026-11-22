@@ -352,7 +352,7 @@ def save_venue(venue: VenueIn, user: int, token: UUID | None = None):
     photos = [prepare_photo(photo) for photo in venue.photos]
     with db() as conn:
         if token is not None and not conn.execute(
-            'DELETE FROM venue_invites WHERE token=%s AND expires_at>NOW() RETURNING token', (token,)
+            'DELETE FROM venue_invites WHERE token=%s AND claimed_by=%s AND expires_at>NOW() RETURNING token', (token, user)
         ).fetchone():
             raise HTTPException(410, 'Havola ishlatilgan yoki muddati tugagan.')
         result = conn.execute('''INSERT INTO venues(name,sport,address,latitude,longitude,price,phone,hours,amenities,extra_amenities,owner_telegram_id)

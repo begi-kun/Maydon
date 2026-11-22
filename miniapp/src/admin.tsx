@@ -69,7 +69,7 @@ export function AdminPanel({onChanged}:{onChanged:()=>void}) {
   {tab==='venues'&&<div className="setting admin-venue-tools">
    <button className="primary" onClick={()=>setAdding(!adding)}>{adding?'Formani yopish':'+ Maydon qoʻshish'}</button>
    <button disabled={creating} onClick={createInvite}>{creating?'Yaratilmoqda…':'Maydon qoʻshish uchun havola yaratish'}</button>
-   {inviteLink&&<><label>Bir martalik havola · 7 kun amal qiladi<input readOnly value={inviteLink} onFocus={e=>e.target.select()}/></label>
+   {inviteLink&&<><label>Havolani Telegram botida faqat birinchi foydalangan odam ariza yubora oladi. Havola 7 kun amal qiladi.<input readOnly value={inviteLink} onFocus={e=>e.target.select()}/></label>
     <button onClick={async()=>{try{await navigator.clipboard.writeText(inviteLink);setLinkMessage('Havola nusxalandi.')}catch{setLinkMessage('Havolani tanlab nusxalang.')}}}>Nusxalash</button></>}
    {linkMessage&&<p role="status">{linkMessage}</p>}
    {adding&&<OwnerForm onExpired={()=>setNotice('Telegram orqali qayta kiring.')} onSaved={()=>{setAdding(false);setNotice('Maydon tekshiruvga yuborildi.');setRevision(n=>n+1);onChanged()}}/>}

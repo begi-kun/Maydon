@@ -4,6 +4,7 @@ import logging
 import re
 import os
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
@@ -36,7 +37,26 @@ async def start(message: Message):
         await support(message)
         return
     if len(payload) == 2 and re.fullmatch(r'venue_[0-9a-f]{32}', payload[1]):
-        url = web_app_url(invite=payload[1][6:])
+        if message.chat.type != 'private' or not message.from_user:
+            return
+        form_token = uuid4()
+        with database() as conn:
+            claimed = conn.execute(
+                """UPDATE venue_invites SET token=%s, claimed_by=%s
+                   WHERE token=%s AND claimed_by IS NULL AND expires_at>NOW()
+                   RETURNING token""",
+                (form_token, message.from_user.id, payload[1][6:]),
+            ).fetchone()
+            if claimed:
+                # Deliver before committing so a failed Telegram send releases the invite.
+                url = web_app_url(invite=form_token.hex)
+                keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
+                    text='Maydon qoʻshish', web_app=WebAppInfo(url=url)
+                )]])
+                await message.answer('Maydon arizasini shu tugma orqali yuboring.', reply_markup=keyboard)
+                return
+        await message.answer('Bu havola ishlatilgan yoki muddati tugagan. Yangi havola uchun adminga murojaat qiling.')
+        return
     if payload[1:] == ['profile']:
         url=web_app_url(profile='1')
     if len(payload)==2 and payload[1].startswith('phone_'):
