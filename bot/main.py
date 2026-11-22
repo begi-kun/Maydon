@@ -1,6 +1,7 @@
 """Bronn long-polling Telegram worker. Deploy as ONE persistent worker."""
 import asyncio
 import logging
+import re
 import os
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -34,6 +35,8 @@ async def start(message: Message):
     if payload[1:] == ['support']:
         await support(message)
         return
+    if len(payload) == 2 and re.fullmatch(r'venue_[0-9a-f]{32}', payload[1]):
+        url = web_app_url(invite=payload[1][6:])
     if payload[1:] == ['profile']:
         url=web_app_url(profile='1')
     if len(payload)==2 and payload[1].startswith('phone_'):
