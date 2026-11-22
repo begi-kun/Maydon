@@ -274,3 +274,14 @@ h1, h2, h3, h4 { letter-spacing: -.035em; }
  .owner-workspace .owner-tabs {grid-template-columns:repeat(2,minmax(0,1fr))}
  .owner-workspace .owner-tabs button {justify-content:flex-start;padding:8px 12px}
 }
+
+.venue-card,.venue-gallery{position:relative}
+.venue-card .card-book{border:0}
+.venue-card .card-book::after{content:"";position:absolute;inset:0}
+.venue-gallery .photos{display:flex;overflow-x:auto;gap:0}
+.venue-image .venue-gallery,.venue-image .gallery-slide{height:100%}
+.venue-gallery .gallery-slide{flex:0 0 100%;min-width:0;scroll-snap-align:start}
+.venue-gallery .gallery-slide img{width:100%;display:block;object-fit:cover}
+.gallery-controls{position:absolute;bottom:4px;right:4px;z-index:1;display:flex;align-items:center;background:#193529;color:white;border-radius:5px;font-size:11px}
+.gallery-controls button{background:transparent;color:white;border:0;font-size:20px;width:24px;padding:0}
+.venue-card:has(.gallery-controls) .photos{position:relative;z-index:1}

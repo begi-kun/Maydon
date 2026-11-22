@@ -18,7 +18,24 @@ export const directions = (lat:number, lon:number) => `https://yandex.com/maps/?
 export const mapLocation = (lat:number, lon:number) => `https://yandex.com/maps/?${new URLSearchParams({ll:`${lon},${lat}`,pt:`${lon},${lat}`,z:'18',l:'map'})}`;
 
 export function PhotoGallery({ids=[],fallback}:{ids?:number[];fallback?:React.ReactNode}) {
- return <div className="photos" tabIndex={ids.length>1?0:undefined} role={ids.length>1?'group':undefined} aria-label={ids.length>1?'Maydon rasmlari — yon tomonga suring':undefined}>{ids.map(id=><PitchPhoto key={id} id={id} fallback={fallback}/>)}</div>;
+ const track=useRef<HTMLDivElement>(null);
+ const [index,setIndex]=useState(0);
+ function show(next:number){
+  const row=track.current;
+  const slide=row?.children[next] as HTMLElement|undefined;
+  if(row && slide)row.scrollLeft+=slide.getBoundingClientRect().left-row.getBoundingClientRect().left;
+ }
+ return <div className="venue-gallery">
+  <div className="photos" tabIndex={ids.length>1?0:undefined} role={ids.length>1?'group':undefined} aria-label={ids.length>1?'Maydon rasmlari — yon tomonga suring':undefined} ref={track} onScroll={()=>{
+   const row=track.current;
+   if(row?.clientWidth)setIndex(Math.round(row.scrollLeft/row.clientWidth));
+  }}>{ids.map(id=><div className="gallery-slide" key={id}><PitchPhoto id={id} fallback={fallback}/></div>)}</div>
+  {ids.length>1&&<div className="gallery-controls">
+   <button type="button" aria-label="Oldingi rasm" onClick={()=>show((index+ids.length-1)%ids.length)}>‹</button>
+   <span>{Math.min(index+1,ids.length)}/{ids.length}</span>
+   <button type="button" aria-label="Keyingi rasm" onClick={()=>show((index+1)%ids.length)}>›</button>
+  </div>}
+ </div>;
 }
 function PitchPhoto({id,fallback}:{id:number;fallback?:React.ReactNode}) {
  const [url,setUrl]=useState('');const [failed,setFailed]=useState(false);
