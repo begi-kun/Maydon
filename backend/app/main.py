@@ -12,7 +12,7 @@ from datetime import date, datetime, time as day_time, timedelta, timezone
 from urllib.parse import parse_qsl
 from contextlib import contextmanager
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 from . import product, protection
 from .migrate import apply_migrations
 
@@ -280,6 +280,23 @@ async def request_venue(request: Request, _: int = Depends(admin)):
     venue = await read_venue(request, AdminVenueIn)
     return await run_in_threadpool(save_venue, venue, venue.owner_telegram_id)
 
+@app.post('/admin/venue-invites', status_code=201)
+def create_venue_invite(_: int = Depends(admin)):
+    username = os.getenv('BOT_USERNAME', '').strip().lstrip('@')
+    if not username:
+        raise HTTPException(503, 'Telegram bot nomi sozlanmagan.')
+    token = uuid4()
+    with db() as conn:
+        conn.execute('INSERT INTO venue_invites(token) VALUES (%s)', (token,))
+    return {'url': f'https://t.me/{username}?start=venue_{token.hex}'}
+
+
+@app.post('/venue-invites/{token}/submit', status_code=201)
+async def submit_venue_invite(token: UUID, request: Request, user: int = Depends(authenticate)):
+    venue = await read_venue(request, VenueIn)
+    return await run_in_threadpool(save_venue, venue, user, token)
+
+
 async def read_venue(request: Request, model):
     body = bytearray()
     async for chunk in request.stream():
@@ -331,9 +348,13 @@ def delete_venue(venue_id: int, user: int = Depends(authenticate)):
         conn.execute('UPDATE venues SET deleted_at=NOW() WHERE id=%s', (venue_id,))
     return {'status': 'deleted'}
 
-def save_venue(venue: VenueIn, user: int):
+def save_venue(venue: VenueIn, user: int, token: UUID | None = None):
     photos = [prepare_photo(photo) for photo in venue.photos]
     with db() as conn:
+        if token is not None and not conn.execute(
+            'DELETE FROM venue_invites WHERE token=%s AND expires_at>NOW() RETURNING token', (token,)
+        ).fetchone():
+            raise HTTPException(410, 'Havola ishlatilgan yoki muddati tugagan.')
         result = conn.execute('''INSERT INTO venues(name,sport,address,latitude,longitude,price,phone,hours,amenities,extra_amenities,owner_telegram_id)
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id''', (*venue.model_dump(exclude={'photos', 'owner_telegram_id'}).values(),user)).fetchone()
         for photo in photos:

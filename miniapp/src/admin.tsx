@@ -2,7 +2,7 @@ import {PilotPanel} from './product';
 import React, {useEffect, useRef, useState} from 'react';
 import {AdminTab, Navigate, AttentionPanel, PeoplePanel, ActivityPanel, NotificationsPanel, BookingDetailPanel} from './admin-operations';
 import {AnalyticsPanel} from './analytics';
-import {API, authHeaders, PhotoGallery, VenueAmenities, mapLocation} from './owner';
+import {API, authHeaders, OwnerForm, PhotoGallery, VenueAmenities, mapLocation} from './owner';
 
 type Venue = {amenities?:string[];extra_amenities?:string;id:number;name:string;address:string;sport:string;price:number;phone:string;hours:string;latitude:number;longitude:number;owner_telegram_id:number;status:string;suspended:boolean;deleted_at:string|null;review_reason:string|null;photos:number[]};
 type Booking = {id:number;venue_id:number;venue_name:string;start_at:string;status:string;user_telegram_id:number|null;customer_name?:string;owner_telegram_id:number;customer_phone:string|null;cancellation_reason:string|null};
@@ -10,6 +10,20 @@ type Action = {path:string;title:string;reason:boolean;description:string};
 const labels:Record<string,string> = {all:'Barchasi',pending:'Kutilmoqda',approved:'Tasdiqlangan',confirmed:'Tasdiqlangan',rejected:'Rad etilgan',cancelled:'Bekor qilingan',suspended:'Toʻxtatilgan',archived:'Arxivlangan'};
 const sports:Record<string,string> = {football:'Futbol',table_tennis:'Stol tennisi',billiards:'Bilyard'};
 export function AdminPanel({onChanged}:{onChanged:()=>void}) {
+ const [adding,setAdding]=useState(false);
+ const [inviteLink,setInviteLink]=useState('');
+ const [creating,setCreating]=useState(false);
+ const [linkMessage,setLinkMessage]=useState('');
+ async function createInvite(){
+  setCreating(true);setLinkMessage('');setInviteLink('');
+  try{
+   const response=await fetch(`${API}/admin/venue-invites`,{method:'POST',headers:authHeaders()});
+   const data=await response.json();
+   if(!response.ok)throw Error(data.detail||'Havola yaratilmadi.');
+   setInviteLink(data.url);
+  }catch(error){setLinkMessage(error instanceof Error?error.message:'Havola yaratilmadi.')}
+  finally{setCreating(false)}
+ }
  const [tab,setTab]=useState<AdminTab>('attention');
  const [detailId,setDetailId]=useState<number|null>(null);const [peopleQuery,setPeopleQuery]=useState('');
  const [status,setStatus]=useState('all');const [query,setQuery]=useState('');const [day,setDay]=useState('');const [venueId,setVenueId]=useState('');const [bookingId,setBookingId]=useState('');
@@ -34,6 +48,14 @@ export function AdminPanel({onChanged}:{onChanged:()=>void}) {
   <button className="primary" disabled={busy} onClick={()=>navigate('venues',{status:'pending'})}>Tasdiqlash kutilayotgan maydonlar</button>
   <div className="admin-tabs" aria-label="Boshqaruv boʻlimlari">{([['attention','Eʼtibor'],['pilot','Pilot'],['analytics','Tahlil'],['venues','Maydonlar'],['bookings','Bronlar'],['people','Egalar va mijozlar'],['activity','Faoliyat'],['notifications','Xabarlar']] as [AdminTab,string][]).map(([key,title])=><button key={key} aria-pressed={tab===key&&!detailId} onClick={()=>switchTab(key)}>{title}</button>)}</div>
   {detailId?<BookingDetailPanel key={detailId} id={detailId} navigate={navigate} back={()=>setDetailId(null)}/>:tab==='attention'?<AttentionPanel navigate={navigate} openBooking={setDetailId}/>:tab==='people'?<PeoplePanel key={peopleQuery} initialQuery={peopleQuery} navigate={navigate} openBooking={setDetailId}/>:tab==='activity'?<ActivityPanel navigate={navigate} openBooking={setDetailId}/>:tab==='notifications'?<NotificationsPanel navigate={navigate} openBooking={setDetailId}/>:tab==='pilot'?<PilotPanel/>:tab==='analytics'?<AnalyticsPanel scope="admin" revision={revision}/>:<>
+  {tab==='venues'&&<div className="setting">
+   <button className="primary" onClick={()=>setAdding(!adding)}>{adding?'Formani yopish':'+ Maydon qoʻshish'}</button>
+   <button disabled={creating} onClick={createInvite}>{creating?'Yaratilmoqda…':'Maydon qoʻshish uchun havola yaratish'}</button>
+   {inviteLink&&<><label>Bir martalik havola · 7 kun amal qiladi<input readOnly value={inviteLink} onFocus={e=>e.target.select()}/></label>
+    <button onClick={async()=>{try{await navigator.clipboard.writeText(inviteLink);setLinkMessage('Havola nusxalandi.')}catch{setLinkMessage('Havolani tanlab nusxalang.')}}}>Nusxalash</button></>}
+   {linkMessage&&<p role="status">{linkMessage}</p>}
+   {adding&&<OwnerForm onExpired={()=>setNotice('Telegram orqali qayta kiring.')} onSaved={()=>{setAdding(false);setNotice('Maydon tekshiruvga yuborildi.');setRevision(n=>n+1);onChanged()}}/>}
+  </div>}
   {(new URLSearchParams(filters).has('customer_id')||new URLSearchParams(filters).has('owner_id'))&&<p className="admin-feedback">{new URLSearchParams(filters).has('owner_id')?'Egasi':'Mijoz'} ID: {new URLSearchParams(filters).get('owner_id')||new URLSearchParams(filters).get('customer_id')} <button onClick={()=>navigate('bookings')}>Filtrni tozalash</button></p>}
   {new URLSearchParams(filters).get('upcoming')==='true'&&<p className="admin-feedback">Faqat kelgusi bronlar <button onClick={()=>navigate('bookings')}>Filtrni tozalash</button></p>}
   <form className="admin-filters" onSubmit={filter}>

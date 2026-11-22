@@ -1,7 +1,7 @@
 import {HourPicker} from './hour-picker';
 import {recordDiscovery} from './discovery-events';
 import {AvailabilitySubscriptions, useProductFeatures} from './product';
-import {VenueAmenities} from './owner';
+import {OwnerForm, VenueAmenities} from './owner';
 import {readDiscovery, discoveryLink, validDiscoveryTime} from './discovery';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
@@ -13,10 +13,12 @@ import {MapExplorer} from './map-explorer';
 import {BookingPicker, localDate} from './booking';
 import {PhotoGallery, directions, API, authHeaders} from './owner';
 
+const invite = new URLSearchParams(window.location.search).get('invite') || '';
+const hasInvite = /^[0-9a-f]{32}$/.test(invite);
 const openSupport = () => window.location.assign('https://t.me/lazyswe');
 type Venue={amenities?:string[];extra_amenities?:string;photos?:number[];id:number;name:string;sport:string;address:string;latitude:number;longitude:number;price:number;phone:string;hours:string;status?:string;suspended?:boolean;review_reason?:string;owner_telegram_id?:number};
 type Booking={venue_id:number;customer_phone?:string|null;id:number;venue_name:string;start_at:string;status:string};
-type Tab='home'|'map'|'bookings'|'profile'|'owner'|'admin';
+type Tab='home'|'map'|'bookings'|'profile'|'owner'|'admin'|'invite';
 const sports=[['all','Barchasi'],['football','Futbol'],['table_tennis','Stol tennisi'],['billiards','Bilyard']];
 const sportName=(sport:string)=>sports.find(([id])=>id===sport)?.[1]||sport;
 const price=(amount:number)=>new Intl.NumberFormat('uz-UZ').format(amount);
@@ -53,7 +55,7 @@ function App(){
  const productFeatures=useProductFeatures();
  const mainRef=useRef<HTMLElement>(null);const navRef=useRef<HTMLElement>(null);
  useEffect(()=>{const nav=navRef.current;if(!nav)return;const resize=new ResizeObserver(()=>document.documentElement.style.setProperty('--nav-height',`${nav.getBoundingClientRect().height}px`));resize.observe(nav);return()=>resize.disconnect()},[]);
- const [tab,setTab]=useState<Tab>(() => { const params=new URLSearchParams(window.location.search); return params.has('admin')?'admin':params.has('owner')?'owner':params.has('profile')?'profile':'home' });
+ const [tab,setTab]=useState<Tab>(() => { const params=new URLSearchParams(window.location.search); return hasInvite?'invite':params.has('admin')?'admin':params.has('owner')?'owner':params.has('profile')?'profile':'home' });
  const [initialDiscovery]=useState(()=>readDiscovery(window.location.search));
  const [sport,setSport]=useState(initialDiscovery.sport);const [query,setQuery]=useState(initialDiscovery.query);const [venues,setVenues]=useState<Venue[]>([]);
  const [selected,setSelected]=useState<Venue|null>(null);const [availabilityRevision,setAvailabilityRevision]=useState(0);const [message,setMessage]=useState('');
@@ -112,7 +114,7 @@ function App(){
   }catch(e){setMessage(e instanceof Error?e.message:'Bron yuborilmadi.')}finally{setBookingBusy(false)}
  }
  useEffect(()=>{if(tab==='owner'&&verifiedUser&&!verifiedUser.owner&&!isAdmin)navigate('profile')},[tab,verifiedUser,isAdmin]);
- const loginPanel=<div className="login-card"><div className="login-symbol"><Send size={30}/></div><span className="eyebrow">SIZNING HISOBINGIZ</span><h2>Oʻyinga qoʻshiling.</h2><p>Oʻz Telegram hisobingiz orqali kiring. Maydonlarni bron qiling va bronlaringizni kuzating.</p>{authLoading?<p>Hisob tekshirilmoqda…</p>:botUsername?<a className="primary login-link" href={`https://t.me/${botUsername}?start=profile`}>Telegram orqali kirish <ArrowUpRight size={18}/></a>:<p>Ilovani Telegram botining menyusidan oching.</p>}<small>Botni oching → Start → Bronnni ochish</small></div>;
+ const loginPanel=<div className="login-card"><div className="login-symbol"><Send size={30}/></div><span className="eyebrow">SIZNING HISOBINGIZ</span><h2>Oʻyinga qoʻshiling.</h2><p>Oʻz Telegram hisobingiz orqali kiring. Maydonlarni bron qiling va bronlaringizni kuzating.</p>{authLoading?<p>Hisob tekshirilmoqda…</p>:botUsername?<a className="primary login-link" href={`https://t.me/${botUsername}?start=${tab==='invite'?`venue_${invite}`:'profile'}`}>Telegram orqali kirish <ArrowUpRight size={18}/></a>:<p>Ilovani Telegram botining menyusidan oching.</p>}<small>Botni oching → Start → Bronnni ochish</small></div>;
  function venueCard(v:Venue){
   const pending=!!searchTime && searchLoading;
   const address=v.address.startsWith('Xaritadagi joy:')?'Joylashuv xaritada belgilangan':v.address;
@@ -168,6 +170,7 @@ function App(){
  </div></details>{b.status==='pending'&&<button className="text-danger" onClick={()=>decide(`/bookings/${b.id}/cancel`,loadBookings)}>Bekor qilish</button>}</article>)}</div>:<Empty title="Keyingi oʻyiningiz hali oldinda" action={<button className="primary compact" onClick={()=>navigate('home')}>Maydon topish <ArrowRight size={16}/></button>}>Maydon tanlang va birinchi bron soʻrovingizni yuboring.</Empty>}</>}
   {(tab==='profile'||(tab==='owner'&&verifiedUser&&!verifiedUser.owner&&!isAdmin))&&<>{pageTitle('SHAXSIY KABINET','Profil','Hisob maʼlumotlari va bronlaringiz.')}{!verifiedUser?loginPanel:<><div className="profile-card"><div className="avatar">{verifiedUser.first_name.slice(0,1)}</div><div><h2>{verifiedUser.first_name}</h2><p>Telegram ID · {verifiedUser.id}</p><p><ShieldCheck size={15}/> Telegram hisobi tasdiqlangan</p></div></div><div className="profile-links">{(verifiedUser.owner||isAdmin)&&<button onClick={()=>navigate('owner')}><span className="menu-icon"><Goal/></span><span><strong>Maydon egasi paneli</strong><small>Maydonlar va bronlarni boshqarish</small></span><ArrowUpRight/></button>}<button onClick={openSupport}><span className="menu-icon"><Send/></span><span><strong>Qo'llab quvvatlash bilan aloqa</strong><small>Maydon qoʻshish uchun admin bilan bogʻlaning</small></span><ArrowUpRight/></button><button onClick={()=>navigate('bookings')}><span className="menu-icon"><CalendarDays/></span><span><strong>Bronlar tarixi</strong><small>Oʻyinlaringiz va bron holati</small></span><ArrowUpRight/></button>{isAdmin&&<button onClick={()=>navigate('admin')}><span className="menu-icon"><ShieldCheck/></span><span><strong>Admin paneli</strong><small>Maydonlar, arizalar va bronlarni boshqarish</small></span><ArrowUpRight/></button>}</div></>}</>}
   {tab==='owner'&&(!verifiedUser||verifiedUser.owner||isAdmin)&&<><button className="back" onClick={()=>navigate('profile')}><ArrowLeft size={16}/> Profil</button>{!verifiedUser?loginPanel:<OwnerPanel isAdmin={isAdmin} onExpired={()=>{setVerifiedUser(null);setIsAdmin(false)}} onChange={loadVenues}/>}</>}
+  {tab==='invite'&&(!verifiedUser?loginPanel:<OwnerForm invite={invite} onExpired={()=>setVerifiedUser(null)} onSaved={loadVenues}/>)}
   {tab==='admin'&&<><button className="back" onClick={()=>navigate('profile')}><ArrowLeft size={16}/> Profil</button>{!verifiedUser?loginPanel:isAdmin?<AdminPanel onChanged={loadVenues}/>:<p role="alert">Bu panelga kirish uchun admin huquqi kerak.</p>}</>}
   </>}
   <footer className="site-footer"><span>Bronn.</span><p>Yaxshi oʻyin — yaxshi maydondan.</p><small>Namangan, Oʻzbekiston</small></footer>

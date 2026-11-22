@@ -100,7 +100,7 @@ async function resizePhoto(file:File):Promise<string> {
  }finally{image.close()}
 }
 
-export function OwnerForm({onSaved,onExpired,initial,onCancel}:{onSaved:()=>void;onExpired:()=>void;initial?:OwnerVenue;onCancel?:()=>void}) {
+export function OwnerForm({onSaved,onExpired,initial,onCancel,invite}:{invite?:string;onSaved:()=>void;onExpired:()=>void;initial?:OwnerVenue;onCancel?:()=>void}) {
  const [kept,setKept]=useState<number[]>(initial?.photos||[]);
  const [location,setLocation]=useState<Location|null>(initial?{latitude:initial.latitude,longitude:initial.longitude,address:initial.address}:null);const [photos,setPhotos]=useState<string[]>([]);const [busy,setBusy]=useState(false);const [processing,setProcessing]=useState(false);const [error,setError]=useState('');const [saved,setSaved]=useState(false);
  async function submit(event:React.FormEvent<HTMLFormElement>){event.preventDefault();
@@ -110,15 +110,15 @@ export function OwnerForm({onSaved,onExpired,initial,onCancel}:{onSaved:()=>void
   if(!location){setError('Maydon joylashuvini xaritada bosing yoki “Hozirgi joylashuvim” tugmasidan foydalaning.');return;}
   if(!photos.length&&!kept.length){setError('Maydonning kamida bitta rasmini yuklang.');return;}
   const data=new FormData(form);setBusy(true);setError('');
-  try{const response=await fetch(initial?`${API}/owner/venues/${initial.id}/edit`:`${API}/venues`,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({...Object.fromEntries(data.entries()),price:Number(data.get('price')),amenities:data.getAll('amenities'),...location,photos,...(initial?{keep_photos:kept}:{})})});
+  try{const response=await fetch(invite?`${API}/venue-invites/${invite}/submit`:initial?`${API}/owner/venues/${initial.id}/edit`:`${API}/venues`,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({...Object.fromEntries(data.entries()),price:Number(data.get('price')),amenities:data.getAll('amenities'),...location,photos,...(initial?{keep_photos:kept}:{})})});
    if(response.status===401){onExpired();throw Error('Kirish muddati tugadi. Ilovani Telegramdan qayta oching.');}
    if(!response.ok){const body=await response.json();throw Error(typeof body.detail==='string'?body.detail:'Maʼlumotlarni tekshiring.');}
    setSaved(true);onSaved();
   }catch(e){setError(e instanceof Error?e.message:'Yuborilmadi. Qayta urinib koʻring.')}finally{setBusy(false)}
  }
- if(saved)return <div className="setting" role="status"><h4>✓ Ariza yuborildi</h4><p>Maydoningiz va rasmlaringiz admin tekshiruvida. Tasdiqlangandan keyin ommaga koʻrinadi.</p><button onClick={()=>{setSaved(false);setPhotos([]);setLocation(null)}}>Yana maydon qoʻshish</button></div>;
+ if(saved)return <div className="setting" role="status"><h4>✓ Ariza yuborildi</h4><p>Maydoningiz va rasmlaringiz admin tekshiruvida. Tasdiqlangandan keyin ommaga koʻrinadi.</p>{!invite&&<button onClick={()=>{setSaved(false);setPhotos([]);setLocation(null)}}>Yana maydon qoʻshish</button>}</div>;
  return <form onSubmit={submit} noValidate><fieldset disabled={busy}><h4>{initial?'Maydonni tahrirlash':'Yangi maydon qoʻshish'}</h4>{initial&&<><p>Oʻzgarishlar admin tekshiruviga yuboriladi. Mavjud bronlar saqlanadi.</p><button type="button" className="back" onClick={onCancel}>Tahrirni bekor qilish</button></>}
-  {!initial&&<label>Maydon egasining Telegram ID raqami<input name="owner_telegram_id" inputMode="numeric" pattern="[1-9][0-9]*" required/></label>}
+  {!initial&&!invite&&<label>Maydon egasining Telegram ID raqami<input name="owner_telegram_id" inputMode="numeric" pattern="[1-9][0-9]*" required/></label>}
   <label>Maydon nomi<input name="name" defaultValue={initial?.name} required minLength={2} maxLength={120}/></label>
   <label>Sport<select name="sport" defaultValue={initial?.sport||'football'}><option value="football">Futbol</option><option value="table_tennis">Stol tennisi</option><option value="billiards">Bilyard</option></select></label>
   <label>Bir soat narxi (soʻm)<input name="price" defaultValue={initial?.price} type="number" min={0} max={100000000} step={1} required/></label>
