@@ -833,6 +833,43 @@ PEOPLE_CTE = """WITH identities AS (
 ) """
 
 
+class AdminMessage(BaseModel):
+    audience: Literal['customers', 'owners', 'all']
+    text: str = Field(min_length=1, max_length=4096)
+    request_id: UUID
+
+
+@app.post('/admin/messages')
+def queue_admin_message(body: AdminMessage, actor: int = Depends(admin)):
+    message = body.text.strip()
+    if not message or chr(0) in message:
+        raise HTTPException(422, 'Xabar matnini tekshiring.')
+    with db() as conn:
+        created = conn.execute("""INSERT INTO admin_messages(admin_id,request_id,audience,body)
+            VALUES (%s,%s,%s,%s) ON CONFLICT DO NOTHING RETURNING request_id""",
+            (actor, body.request_id, body.audience, message)).fetchone()
+        if not created:
+            previous = conn.execute("""SELECT audience,body,queued FROM admin_messages
+                WHERE admin_id=%s AND request_id=%s""", (actor, body.request_id)).fetchone()
+            if previous['audience'] != body.audience or previous['body'] != message:
+                raise HTTPException(409, 'Xabar soʻrovi avval ishlatilgan.')
+            return {'queued': previous['queued']}
+        queued = conn.execute("""WITH owners AS (SELECT DISTINCT owner_telegram_id AS id FROM venues),
+            recipients AS (
+                SELECT id FROM owners WHERE %s IN ('owners','all')
+                UNION SELECT user_telegram_id FROM bookings WHERE user_telegram_id IS NOT NULL
+                    AND %s IN ('customers','all')
+                UNION SELECT id FROM (SELECT telegram_id AS id FROM telegram_profiles
+                    UNION SELECT telegram_id FROM telegram_contacts) registered
+                    WHERE %s IN ('customers','all') AND NOT EXISTS
+                    (SELECT 1 FROM owners WHERE owners.id=registered.id)
+            ) INSERT INTO notifications(recipient_id,body) SELECT id,%s FROM recipients""",
+            (body.audience, body.audience, body.audience, message)).rowcount
+        conn.execute('UPDATE admin_messages SET queued=%s WHERE admin_id=%s AND request_id=%s',
+                     (queued, actor, body.request_id))
+        return {'queued': queued}
+
+
 @app.get('/admin/people')
 def admin_people(response: Response, q: str = Query(default='', max_length=120),
                  role: Literal['all','owners','customers','manual'] = 'all',
