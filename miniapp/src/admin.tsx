@@ -1,3 +1,5 @@
+import {BellRing, CalendarDays, ChartColumn, ClipboardCheck, Flag, History, MapPin, MessagesSquare, UsersRound, type LucideIcon} from 'lucide-react';
+import './admin.css';
 import {PilotPanel} from './product';
 import React, {useEffect, useRef, useState} from 'react';
 import {AdminTab, Navigate, AttentionPanel, PeoplePanel, ActivityPanel, NotificationsPanel, BookingDetailPanel} from './admin-operations';
@@ -9,6 +11,16 @@ type Booking = {id:number;venue_id:number;venue_name:string;start_at:string;stat
 type Action = {path:string;title:string;reason:boolean;description:string};
 const labels:Record<string,string> = {all:'Barchasi',pending:'Kutilmoqda',approved:'Tasdiqlangan',confirmed:'Tasdiqlangan',rejected:'Rad etilgan',cancelled:'Bekor qilingan',suspended:'Toʻxtatilgan',archived:'Arxivlangan'};
 const sports:Record<string,string> = {football:'Futbol',table_tennis:'Stol tennisi',billiards:'Bilyard'};
+const sections: {key:AdminTab; title:string; icon:LucideIcon}[] = [
+ {key:'attention', title:'Eʼtibor', icon:BellRing},
+ {key:'venues', title:'Maydonlar', icon:MapPin},
+ {key:'bookings', title:'Bronlar', icon:CalendarDays},
+ {key:'people', title:'Egalar va mijozlar', icon:UsersRound},
+ {key:'notifications', title:'Xabarlar', icon:MessagesSquare},
+ {key:'activity', title:'Faoliyat', icon:History},
+ {key:'analytics', title:'Tahlil', icon:ChartColumn},
+ {key:'pilot', title:'Pilot', icon:Flag},
+];
 export function AdminPanel({onChanged}:{onChanged:()=>void}) {
  const [adding,setAdding]=useState(false);
  const [inviteLink,setInviteLink]=useState('');
@@ -44,11 +56,17 @@ export function AdminPanel({onChanged}:{onChanged:()=>void}) {
  useEffect(()=>{if(action)dialog.current?.showModal();else dialog.current?.close()},[action]);
  const rows=tab==='venues'?venues:bookings;
  return <section className="admin-panel">
-  <div className="page-title"><span className="eyebrow">ADMIN BOSHQARUVI</span><h1>Admin paneli</h1><p>Muammolarni toping, bronlarni tekshiring va faoliyatni kuzating.</p></div>
-  <button className="primary" disabled={busy} onClick={()=>navigate('venues',{status:'pending'})}>Tasdiqlash kutilayotgan maydonlar</button>
-  <div className="admin-tabs" aria-label="Boshqaruv boʻlimlari">{([['attention','Eʼtibor'],['pilot','Pilot'],['analytics','Tahlil'],['venues','Maydonlar'],['bookings','Bronlar'],['people','Egalar va mijozlar'],['activity','Faoliyat'],['notifications','Xabarlar']] as [AdminTab,string][]).map(([key,title])=><button key={key} aria-pressed={tab===key&&!detailId} onClick={()=>switchTab(key)}>{title}</button>)}</div>
+  <header className="admin-header"><h1>Admin paneli</h1>
+   <button disabled={busy} onClick={()=>navigate('venues',{status:'pending'})}><ClipboardCheck size={18} aria-hidden="true"/>Tasdiqlash kutilayotgan maydonlar</button>
+  </header>
+  <div className="admin-layout">
+   <nav className="admin-navigation" aria-label="Boshqaruv boʻlimlari">
+    {sections.map(({key,title,icon:Icon})=><button key={key} aria-current={tab===key?'page':undefined} onClick={()=>switchTab(key)}><Icon size={18} aria-hidden="true"/>{title}</button>)}
+   </nav>
+   <div className="admin-workspace">
   {detailId?<BookingDetailPanel key={detailId} id={detailId} navigate={navigate} back={()=>setDetailId(null)}/>:tab==='attention'?<AttentionPanel navigate={navigate} openBooking={setDetailId}/>:tab==='people'?<PeoplePanel key={peopleQuery} initialQuery={peopleQuery} navigate={navigate} openBooking={setDetailId}/>:tab==='activity'?<ActivityPanel navigate={navigate} openBooking={setDetailId}/>:tab==='notifications'?<NotificationsPanel navigate={navigate} openBooking={setDetailId}/>:tab==='pilot'?<PilotPanel/>:tab==='analytics'?<AnalyticsPanel scope="admin" revision={revision}/>:<>
-  {tab==='venues'&&<div className="setting">
+  <h2>{tab==='venues'?'Maydonlar':'Bronlar'}</h2>
+  {tab==='venues'&&<div className="setting admin-venue-tools">
    <button className="primary" onClick={()=>setAdding(!adding)}>{adding?'Formani yopish':'+ Maydon qoʻshish'}</button>
    <button disabled={creating} onClick={createInvite}>{creating?'Yaratilmoqda…':'Maydon qoʻshish uchun havola yaratish'}</button>
    {inviteLink&&<><label>Bir martalik havola · 7 kun amal qiladi<input readOnly value={inviteLink} onFocus={e=>e.target.select()}/></label>
@@ -71,6 +89,8 @@ export function AdminPanel({onChanged}:{onChanged:()=>void}) {
   </article>):bookings.map(b=><article className="setting" key={b.id}><div className="admin-card-heading"><span>Bron #{b.id}</span><span className={`status status-${b.status}`}>{labels[b.status]}</span></div><h3>{b.venue_name}</h3><button onClick={()=>setDetailId(b.id)}>Tafsilotlar va tarix →</button><p>Maydon #{b.venue_id} · Egasi ID: {b.owner_telegram_id}</p><strong>{new Date(b.start_at).toLocaleString('uz-UZ',{timeZone:'Asia/Tashkent'})} (UTC+5)</strong><p>{b.user_telegram_id?`Mijoz Telegram ID: ${b.user_telegram_id}`:`Qoʻlda kiritilgan: ${b.customer_name||"Mijoz"}`}</p>{b.customer_phone?<a href={`tel:${b.customer_phone}`}>{b.customer_phone}</a>:<p>Telefon raqami saqlanmagan.</p>}{b.cancellation_reason&&<p>Bekor qilish sababi: {b.cancellation_reason}</p>}{['pending','confirmed'].includes(b.status)&&new Date(b.start_at).getTime()>Date.now()&&<div className="decision-actions"><button onClick={()=>choose({path:`/admin/bookings/${b.id}/cancel`,title:`Bron #${b.id} ni bekor qilish`,reason:true,description:'Vaqt yana boʻshaydi. Mijoz va maydon egasiga sabab yuboriladi.'})}>Bronni bekor qilish</button></div>}</article>)}</div>}
   <div className="admin-pagination"><button disabled={offset===0} onClick={()=>setOffset(n=>Math.max(0,n-50))}>← Oldingi</button><span>{offset/50+1}-sahifa · {rows.length} ta natija</span><button disabled={rows.length<50} onClick={()=>setOffset(n=>n+50)}>Keyingi →</button></div></>}
   </>}
+   </div>
+  </div>
   <dialog ref={dialog} className="admin-confirm" aria-label={action?.title} onCancel={e=>{e.preventDefault();if(!busy)setAction(null)}}>{action&&<><form onSubmit={e=>{e.preventDefault();void submit(action)}} aria-label={action.title}><h2>{action.title}</h2><p>{action.description}</p>{action.reason&&<label>Sabab (3–500 belgi)<textarea autoFocus required minLength={3} maxLength={500} value={reason} onChange={e=>setReason(e.target.value)} disabled={busy}/></label>}{actionError&&<p role="alert" className="admin-error">{actionError}</p>}<div className="decision-actions"><button disabled={busy||(action.reason&&reason.trim().length<3)} type="submit">{busy?'Saqlanmoqda…':'Tasdiqlash'}</button><button disabled={busy} type="button" onClick={()=>setAction(null)}>Ortga</button></div></form></>}</dialog>
  </section>;
 }
